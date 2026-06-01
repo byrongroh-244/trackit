@@ -1,0 +1,760 @@
+{
+  "_meta": {
+    "version": "2.0.0",
+    "description": "Comprehensive micro-step library for TrackIt. Keys: subject → archetype → sub_type → grade_band. Grade bands: high_school (9-10) and advanced (11-12). Steps are plain strings consumed by generateSubtasks() via spaceSteps().",
+    "subjects": ["ela", "math", "science", "social_studies"],
+    "grade_bands": ["high_school", "advanced"],
+    "step_design_laws": ["zero_friction_initiation", "materials_before_thinking", "planning_execution_firewall", "cognitive_mode_tagging", "time_blindness_pacing", "completion_signal", "escape_valve"]
+  },
+
+  "essay": {
+    "argumentative": {
+      "high_school": [
+        "Set up your workspace — open a blank doc, write the title at the top, phone away",
+        "Gather the prompt, rubric, any source texts, and your class notes",
+        "Read the prompt twice — underline the key action words and circle the requirements",
+        "Brain dump: write everything you know about this topic in bullet points for 5 minutes",
+        "Find 2-3 specific pieces of evidence or examples that relate to the prompt",
+        "Write 3 different thesis statements — circle the most specific and arguable one",
+        "Build a paragraph-by-paragraph outline: intro, body paragraphs, conclusion",
+        "BREAK — the planning is done. Take 5 minutes away before writing",
+        "Write the introduction — hook, context, thesis last",
+        "Write Body Paragraph 1 — topic sentence, evidence, 2-3 sentences of analysis",
+        "Write Body Paragraph 2 — topic sentence, evidence, 2-3 sentences of analysis",
+        "Write the conclusion — restate argument in new words, why it matters",
+        "Read the whole essay aloud — mark anything that sounds off",
+        "Check against the rubric — fix anything missing",
+        "Format and submit"
+      ],
+      "advanced": [
+        "Open a working document with two sections: NOTES and ESSAY",
+        "Gather all materials — prompt, sources, rubric, class notes",
+        "Deconstruct the prompt: identify the task verb, constraints, and write a plain-language restatement",
+        "Collect 4-6 pieces of specific evidence with locations — do not start writing yet",
+        "Identify the pattern across your evidence — write 3-4 sentences on what it reveals",
+        "Draft 3 thesis statements — your thesis must be debatable, specific, and significant",
+        "Build a hierarchical outline with counterargument paragraph planned",
+        "BREAK — mandatory 5-8 minutes before drafting",
+        "Write the introduction — hook strategy, context, thesis",
+        "Write Body Paragraph 1 — integrated evidence, 3-4 sentences of analysis",
+        "Write Body Paragraph 2 — transition, integrated evidence, analysis",
+        "Write Body Paragraph 3 — counterargument, rebuttal, connection to thesis",
+        "Write the conclusion — synthesis not summary, resonant closing",
+        "Argument coherence check — read only topic sentences in sequence",
+        "Read full draft aloud — mark thin analysis and awkward transitions",
+        "Rubric audit — confirm thesis, evidence integration, analysis depth",
+        "Format and submit"
+      ]
+    },
+    "analytical": {
+      "high_school": [
+        "Set up workspace — open doc, write title and date, phone away",
+        "Gather the text, prompt, rubric, and any annotation notes",
+        "Read the prompt carefully — what literary element or technique are you analyzing?",
+        "Re-read the relevant sections of the text — mark 2-3 key passages",
+        "Write what the author is doing with language in those passages — one sentence each",
+        "Draft your thesis: [Author] uses [technique] to show [specific argument]",
+        "Build your outline — each body paragraph around one piece of evidence",
+        "BREAK — 4-5 minutes before writing",
+        "Write introduction — context, thesis last",
+        "Write each body paragraph — topic sentence, quote with citation, 2-3 analysis sentences",
+        "Write conclusion — what does this technique reveal about the text overall?",
+        "Read aloud and check that analysis explains WHY not just WHAT",
+        "Rubric check and format",
+        "Submit"
+      ],
+      "advanced": [
+        "Set up working document — NOTES section and ESSAY section",
+        "Gather text, prompt, secondary sources if required, rubric",
+        "Annotate the prompt — identify task verb, scope, and any required analytical lens",
+        "Re-read targeted sections — annotate for technique, effect, and textual pattern",
+        "Write 4-6 sentences identifying what the author is repeatedly doing and why it matters",
+        "Draft 3 thesis statements — push toward: 'By [technique], [author] [claim], suggesting [significance]'",
+        "Build full outline — include counterargument or complicating evidence paragraph",
+        "BREAK — 6-8 minutes minimum",
+        "Write introduction with specific hook strategy — paradox, striking moment, or context",
+        "Write Body Paragraph 1 — integrated quote, 3-4 analysis sentences, reconnect to thesis",
+        "Write Body Paragraph 2 — transition, integrated evidence, analysis",
+        "Write Body Paragraph 3 — complicating or counterargument evidence and response",
+        "Write synthesis conclusion — how argument changes how we read the text",
+        "Topic sentence coherence check",
+        "Full read-aloud — fix thin analysis and unclear transitions",
+        "Rubric audit — thesis specificity, analysis depth, evidence integration",
+        "Format, citations, submit"
+      ]
+    },
+    "research": {
+      "high_school": [
+        "Create research document with three sections: SOURCES, NOTES, DRAFT",
+        "Read full prompt — confirm source count, citation format, length requirement",
+        "Write one sentence defining your specific topic and angle",
+        "Write 3-5 research questions before opening any search engine",
+        "Set a 30-minute timer — find all required sources and log them in SOURCES section",
+        "Read each source and take notes in NOTES section — only what answers your research questions",
+        "BREAK — close all browser tabs before drafting",
+        "Build your argument and paragraph sequence from your notes",
+        "Write introduction with thesis",
+        "Write each body paragraph — evidence with citation, analysis connecting to thesis",
+        "Write conclusion — restate thesis, significance, implications",
+        "Build Works Cited or References page — every source cited in text must appear here",
+        "Read draft aloud — check every fact has a citation",
+        "Final rubric check",
+        "Format and submit"
+      ],
+      "advanced": [
+        "Create five-section document: PARAMETERS, QUESTIONS, SOURCES, NOTES, DRAFT",
+        "Document all assignment requirements in PARAMETERS section",
+        "Write a research question and preliminary hypothesis before searching",
+        "Research in priority order: peer-reviewed databases, books, credible journalism — 45-minute timer",
+        "Take synthesizing notes — track what sources agree and disagree about, not just what each says",
+        "Develop final thesis from evidence — must be argumentative, specific, complex, significant",
+        "Build synthesis-based outline — each paragraph around a CLAIM with multiple sources",
+        "BREAK — 10 minutes before drafting",
+        "Write introduction with contextualized hook and thesis",
+        "Write body paragraphs — multi-source synthesis, varied signal phrases, deep analysis",
+        "Write counterargument and rebuttal paragraph",
+        "Write synthesis conclusion — implications and significance",
+        "Build Works Cited — confirm every in-text citation matches and every source is listed",
+        "Synthesis audit — no paragraph relies on only one source",
+        "Full read-aloud for argument coherence",
+        "Final rubric audit",
+        "Format and submit"
+      ]
+    },
+    "personal": {
+      "high_school": [
+        "Open document and write the prompt at the top",
+        "Free write for 8 minutes — do not edit, just write everything that comes to mind",
+        "Circle the most honest or specific moment in your free write",
+        "Write your central claim or insight in one sentence",
+        "Build a loose outline: opening scene or moment, development, reflection",
+        "Write a full first draft without stopping to edit",
+        "BREAK — 5 minutes",
+        "Read aloud — mark anything that feels generic or unclear",
+        "Revise for specificity — replace abstract statements with concrete details",
+        "Check length and format requirements",
+        "Final read and submit"
+      ],
+      "advanced": [
+        "Read the prompt and write a plain-language restatement of what it is asking",
+        "Free write for 10 minutes — follow any thread that feels true",
+        "Identify the most specific, unexpected, or revealing moment in your free write",
+        "Draft 3 possible opening lines — avoid starting with a definition or sweeping statement",
+        "Write a central insight in one sentence — what does this essay reveal about you or an idea?",
+        "Outline the essay — where does the narrative or argument move? What is the turn?",
+        "BREAK — 5 minutes",
+        "Write a complete first draft without self-editing",
+        "Read aloud — mark any place where the language becomes generic, vague, or performative",
+        "Revise for specificity, honesty, and voice",
+        "Check that the ending earns its conclusion rather than stating it",
+        "Final rubric or prompt check",
+        "Format and submit"
+      ]
+    }
+  },
+
+  "lab_report": {
+    "biology": {
+      "high_school": [
+        "Gather all lab records — original data table, observation notes, pre-lab, handout",
+        "Read rubric and list every required section — create headings in your document",
+        "Write Title and Purpose — specific, includes independent and dependent variable",
+        "Copy hypothesis from pre-lab — do not revise it to match results",
+        "Write Materials list with quantities and Procedure in numbered past-tense steps",
+        "Transfer data table exactly as recorded — do not modify any values",
+        "Create graphs — title, labeled axes with units, plotted points, best-fit line if required",
+        "BREAK — 5 minutes before analysis",
+        "Write Analysis — describe pattern with specific numbers, explain biological mechanism",
+        "Write Conclusion — hypothesis evaluation with evidence, 2 error sources with directional effect, 1 improvement",
+        "Rubric check — every section present, all graphs labeled, analysis not just summary",
+        "Format heading and submit"
+      ],
+      "advanced": [
+        "Assemble all lab records — notebook pages, observation notes, pre-lab, handout with rubric",
+        "Read rubric — list every section with point values, note format requirements",
+        "Write Introduction — specific biological mechanism named, research question as final sentence",
+        "Write Hypothesis — If/Then/Because with named mechanism and falsification condition",
+        "Write Materials with specifications and Procedure at replication-level precision in passive voice",
+        "Present data table — correct significant figures, units in all headers, qualitative observations as data",
+        "Create graphs — labeled axes with units, error bars if applicable, best-fit line with equation and R²",
+        "BREAK — 8 minutes before analysis",
+        "Write Analysis — trend with specific numbers, all calculations with full work shown, anomalous data addressed, mechanism explained",
+        "Write Conclusion — hypothesis evaluation with quantitative evidence, 3 classified error sources with directional effect, 2 improvements, 1 follow-up question",
+        "Scientific accuracy audit — significant figures, units, all claims supported",
+        "Full rubric audit",
+        "Format and submit"
+      ]
+    },
+    "chemistry": {
+      "high_school": [
+        "Gather all lab records — data table, observation notes, pre-lab, handout",
+        "List every required section from the rubric — create headings in document",
+        "Write Title, Purpose, and Hypothesis from pre-lab materials",
+        "Write Materials and Procedure in numbered past-tense steps",
+        "Transfer data table — include units in all headers",
+        "Create required graphs with labeled axes and units",
+        "BREAK — 5 minutes before analysis",
+        "Write Analysis — show all stoichiometric or thermodynamic calculations step by step with units",
+        "Calculate percent error — show formula, substituted values, and result",
+        "Write Conclusion — hypothesis evaluation, 2 error sources, directional effect, 1 improvement",
+        "Rubric check — all calculations shown, significant figures consistent",
+        "Format and submit"
+      ],
+      "advanced": [
+        "Assemble all lab records including original notebook pages",
+        "Read rubric — note significant figures policy, error analysis requirements, citation format",
+        "Write Introduction — chemical principles with equations in correct notation, research question",
+        "Write Hypothesis with null hypothesis if required",
+        "Write Materials with specifications and chemical concentrations — Procedure in passive voice at replication level",
+        "Present data — significant figures throughout, uncertainty values if recorded",
+        "Create graphs — error bars if applicable, best-fit line with equation and R²",
+        "BREAK — 8 minutes before analysis",
+        "Write Analysis — all calculations with units and sig figs maintained, percent error calculated and interpreted, anomalous data addressed",
+        "Write Conclusion — hypothesis evaluation with quantitative evidence, 3 classified error sources, directional effect for each, 2 improvements, 1 follow-up",
+        "Significant figures and units audit throughout entire report",
+        "Full rubric audit",
+        "Format and submit"
+      ]
+    },
+    "physics": {
+      "high_school": [
+        "Gather all lab records — data table, observations, pre-lab, handout",
+        "List required sections — create headings",
+        "Write Title, Purpose, and Hypothesis identifying the physical law being tested",
+        "Write Materials and Procedure in past-tense numbered steps",
+        "Transfer data table with units",
+        "Create graphs — labeled axes with units, best-fit line with equation",
+        "BREAK — 5 minutes before analysis",
+        "Write Analysis — describe trend with numbers, show all calculations with units, explain physical mechanism",
+        "Write Conclusion — hypothesis evaluation, 2 error sources, 1 improvement",
+        "Rubric check and format",
+        "Submit"
+      ],
+      "advanced": [
+        "Assemble all lab records",
+        "Read rubric — note uncertainty requirements, free-body diagram expectations, graph standards",
+        "Write Introduction — relevant physical laws and equations stated, research question",
+        "Write Hypothesis with quantitative prediction where possible",
+        "Write Materials with instrument specifications and Procedure at replication-level detail",
+        "Present data — measurements with uncertainty values, correct significant figures",
+        "Create graphs — error bars representing measurement uncertainty, best-fit line with equation, R² value, slope interpreted in physical terms",
+        "BREAK — 8 minutes",
+        "Write Analysis — all calculations with uncertainty propagation, interpret slope and intercept physically, address anomalous data",
+        "Write Conclusion — hypothesis evaluation, 3 classified error sources with directional effect, 2 improvements, 1 follow-up question",
+        "Verify all units are SI throughout",
+        "Full rubric audit",
+        "Format and submit"
+      ]
+    }
+  },
+
+  "reading": {
+    "chapter": {
+      "high_school": [
+        "Get the text and your annotation tools ready — phone away",
+        "Preview the reading — read section headings, first sentence of each paragraph, last paragraph",
+        "Write one purpose question at the top of your notes before reading",
+        "First read — read all the way through, mark only what strongly connects to your purpose question",
+        "Second pass — write a margin annotation for each marked passage: what it says and why it matters",
+        "Write a 3-sentence summary of the reading in your own words",
+        "Check any comprehension questions or annotation requirements from the assignment",
+        "Submit or organize for class"
+      ],
+      "advanced": [
+        "Prepare all texts and open a notes document alongside",
+        "Write your analytical lens in your notes before reading — what framework are you applying?",
+        "First read — comprehension and initial response, annotate sparingly, write 3-5 summary bullets after",
+        "Second read — targeted analysis of marked passages, annotate for technique and effect",
+        "Write your reading response if required — analytical claim, evidence with page numbers, analysis, closing question",
+        "Annotation quality check — confirm annotations are analytical not just summary",
+        "Format and submit"
+      ]
+    },
+    "article": {
+      "high_school": [
+        "Get the article and annotation tools ready",
+        "Read the title, subheadings, and first and last paragraphs before reading",
+        "Write one focus question before reading",
+        "Read the article all the way through — circle unfamiliar terms",
+        "Look up any terms you circled",
+        "Annotate: underline the thesis, mark 2-3 key pieces of evidence",
+        "Write 2-3 sentences responding to your focus question",
+        "Submit or organize"
+      ],
+      "advanced": [
+        "Identify the article's genre — academic, journalism, opinion, or policy",
+        "Preview structure and establish your analytical lens before reading",
+        "First read — track argument structure, annotate main claim and evidence",
+        "Second read — analyze rhetorical choices: what does the author do and why?",
+        "Write analytical response — specific claim, textual evidence, analysis of technique",
+        "Check response quality — every sentence should be analytical not descriptive",
+        "Submit"
+      ]
+    }
+  },
+
+  "problem_set": {
+    "math": {
+      "high_school": [
+        "Clear desk — get pencil, eraser, calculator if allowed, class notes",
+        "Survey the whole assignment before starting — count problems, mark familiar vs unfamiliar",
+        "Write a time budget at the top — total time divided by number of problems",
+        "Do all the familiar problems first — show every step, one operation per line",
+        "Quick-check the familiar problems — plug answers back in or use inverse operation",
+        "Attempt unfamiliar problems using a relevant worked example from notes — set a 4-minute timer per problem",
+        "For any stuck problem: skip, mark it, come back — write a stuck note if still stuck after returning",
+        "Final pass — check all answers for correct units, correct format, and reasonableness",
+        "Label with name and submit or file in homework folder"
+      ],
+      "advanced": [
+        "Clear desk — confirm calculator permissions and assemble all reference materials",
+        "Survey and triage — label every problem Bracket A (know exactly what to do), B (need to look something up), or C (not sure where to start)",
+        "Write time budget — 40% of time to A, 40% to B, 20% to C",
+        "Complete all Bracket A problems — write setup line, show every step, box final answer",
+        "Work through Bracket B — find a relevant worked example in notes, identify what differs, solve",
+        "BREAK — 4-5 minutes before Bracket C",
+        "Bracket C — write all given information, write what you need to find, try 2 methods, write a detailed stuck note if neither works",
+        "Systematic verification — check answers using a method different from the one used to solve",
+        "Label and submit"
+      ]
+    },
+    "calculus": {
+      "high_school": [
+        "Assemble notes, formula sheet if permitted, graphing calculator if allowed",
+        "Survey all problems — identify which technique each uses (limit, derivative, integral)",
+        "Complete familiar derivative or integral problems — show all steps",
+        "For applied problems: draw a diagram first, identify the function, then differentiate or integrate",
+        "Check derivatives by differentiating again — check integrals by differentiating your answer",
+        "Flag any problem where your answer seems unreasonable in magnitude",
+        "Submit with work shown throughout"
+      ],
+      "advanced": [
+        "Confirm calculator or no-calculator context — this changes which techniques are available",
+        "Triage — identify technique required for each problem before starting any",
+        "Non-calculator section: work algebraically throughout, leave answers in exact form",
+        "Calculator section: show setup and reasoning even if calculator produces the numerical answer",
+        "For FRQ-style multi-part problems: treat each part as its own problem with its own answer labeled",
+        "Check all answers: derivatives by definition check, definite integrals by FTC, verify bounds on area/accumulation problems",
+        "Label and submit with all work shown"
+      ]
+    },
+    "statistics": {
+      "high_school": [
+        "Confirm calculator has statistics functions loaded and is permitted",
+        "For each problem: identify the data type first (categorical or quantitative) before choosing a method",
+        "Show all calculator setup — function name, values entered, result",
+        "Produce any required graphs with labeled axes, title, and scale",
+        "For inference problems: identify the procedure by name before calculating",
+        "Check that all probabilities are between 0 and 1 and all standard deviations are positive",
+        "Write conclusions in context — not just a number, but what it means",
+        "Submit with all work and context statements"
+      ],
+      "advanced": [
+        "Confirm calculator model and functions available",
+        "For each problem: state the parameter of interest and identify the appropriate procedure before computing",
+        "Show all four steps for every inference problem: State, Plan/Check conditions, Do, Conclude",
+        "Check conditions explicitly — do not assume they are met",
+        "Write all conclusions in context at the population level with correct statistical language",
+        "Distinguish statistical significance from practical significance for any test result",
+        "Label and submit"
+      ]
+    },
+    "science": {
+      "high_school": [
+        "Get the assignment, your class notes, and a calculator if applicable",
+        "For each problem: write the given information and what you are solving for before computing",
+        "Write the relevant formula or equation before substituting values",
+        "Show all unit conversions — carry units through every calculation step",
+        "Check that your answer has the correct units and is a physically reasonable magnitude",
+        "For any answer that seems wrong: re-check the formula and unit conversions before re-doing the arithmetic",
+        "Submit with work shown"
+      ],
+      "advanced": [
+        "Identify which scientific law or equation each problem is testing before starting",
+        "Write all given information with units — identify what is unknown",
+        "Show the symbolic equation before substituting numerical values",
+        "Carry significant figures throughout — report final answer to correct sig figs",
+        "Include uncertainty if measurement precision is specified",
+        "Check answers against expected order of magnitude for the physical quantity",
+        "Submit"
+      ]
+    }
+  },
+
+  "test_prep": {
+    "exam": {
+      "high_school": [
+        "Gather all unit notes, returned graded work, and blank practice paper — phone away",
+        "Build a complete topic list — check notes, vocabulary lists, learning objectives, and textbook chapter review",
+        "Self-test each topic before rating confidence — cover notes and try to explain or solve from memory",
+        "Rate each topic 1 (confused), 2 (know when reading), or 3 (can produce without notes)",
+        "Active recall on rated-1 topics — write everything from memory, then identify gaps",
+        "For any diagram topic: draw it from memory, compare to notes, draw it again",
+        "Practice rated-2 topics with application questions — identify the specific step that produced each error",
+        "BREAK — 5-7 minutes",
+        "Timed mixed practice — 20-25 minutes, no notes, all topic types",
+        "Score and categorize all errors by type — vocabulary, concept, application, or careless",
+        "Write pre-test reference card — formulas, diagrams, error reminders",
+        "Review card once before sleeping"
+      ],
+      "advanced": [
+        "Assemble all unit materials and released AP exam resources if applicable",
+        "Build comprehensive topic inventory — cross-reference with AP CED or official learning objectives",
+        "Self-test topics using production standard — rating of 3 means can produce fully from memory without notes",
+        "Deep retrieval practice on rated-1 topics — recall from memory, identify gaps, attempt a released FRQ on that topic",
+        "Score FRQ against official scoring guidelines — identify specifically which points were missed",
+        "Error pattern analysis on rated-2 topics — classify as Formula A, Procedural B, Arithmetic C, or Interpretation D",
+        "BREAK — 8-10 minutes before simulation",
+        "Full timed simulation at authentic exam conditions and time",
+        "Record which topic areas, time periods, and skill types produced the most errors",
+        "Build pre-test card from simulation performance data — weakest topics, procedural checklists, strategic reminders",
+        "Review card tonight and before the test"
+      ]
+    },
+    "quiz": {
+      "high_school": [
+        "Identify exactly what the quiz covers — ask your teacher or check the assignment",
+        "List every term, concept, or skill that could appear",
+        "Cover your notes and try to write each definition or solve each type from memory",
+        "Mark everything you could not produce — these are your study targets",
+        "Review only the marked items — read, cover, reproduce, check",
+        "Do 3-5 practice problems or application questions from class notes",
+        "Write a half-sheet with the 3-5 most important things to remember before the quiz"
+      ],
+      "advanced": [
+        "Confirm the exact scope and format of the quiz",
+        "Self-test each topic before any re-reading — production standard, not recognition",
+        "Focus all study time on rated-1 and rated-2 topics — do not re-study what you already know",
+        "For any calculation or procedure: practice it from scratch, show all steps",
+        "10-minute timed practice under quiz conditions",
+        "Write a brief review card based on what went wrong in the practice"
+      ]
+    },
+    "midterm": {
+      "high_school": [
+        "Gather all unit notes from the entire semester covered — organize by unit",
+        "Build a complete topic inventory across all units",
+        "Identify which units you are weakest in — allocate most study time there",
+        "Self-test topic by topic, unit by unit, from memory",
+        "Active recall and diagram practice for rated-1 topics across all units",
+        "Application and error-analysis practice for rated-2 topics",
+        "BREAK before simulation",
+        "Timed mixed practice covering multiple units",
+        "Write a comprehensive pre-test card organized by unit",
+        "Distribute study across multiple sessions — do not cram in one night"
+      ],
+      "advanced": [
+        "Build a multi-unit topic inventory cross-referenced with official learning objectives",
+        "Rate every topic across all units using production-level standard",
+        "Study in unit order — complete one unit before moving to the next",
+        "For each unit: recall practice, FRQ attempt, error analysis",
+        "Pay special attention to cross-unit connections — midterms often test cumulative reasoning",
+        "BREAK — 10 minutes before simulation",
+        "Full timed simulation mixing content from all units",
+        "Score and analyze errors by unit and skill type",
+        "Build a pre-test card organized by unit with your personal error patterns",
+        "Distribute preparation across at least 4 separate study sessions"
+      ]
+    },
+    "final": {
+      "high_school": [
+        "Map out the full year or semester scope — list every unit covered",
+        "Identify which units carry the most weight on the final",
+        "Build a topic inventory for each unit",
+        "Self-test all topics — identify your weakest areas across the year",
+        "Allocate study time by weakness — weakest units get the most time",
+        "Active recall and practice for all rated-1 topics",
+        "Application practice for rated-2 topics",
+        "Build a master review card organized by unit",
+        "Timed simulation covering the full year scope",
+        "Rest adequately before the exam"
+      ],
+      "advanced": [
+        "Build a comprehensive year-scope topic inventory aligned to the AP CED or course framework",
+        "Identify the highest-weight units and the skill types most frequently tested on released exams",
+        "Use released full practice exams as the primary study tool — not your notes",
+        "Study in focused unit sprints — one unit per session, complete recall and FRQ practice",
+        "Full timed practice exam under authentic conditions",
+        "Score using official guidelines — analyze errors by unit, skill type, and question format",
+        "Address your specific error patterns with targeted retrieval practice",
+        "Build a final pre-exam strategy card with your personal weak areas and reminders",
+        "Do not study new content the night before — review your card, sleep, hydrate"
+      ]
+    }
+  },
+
+  "project": {
+    "presentation": {
+      "high_school": [
+        "Read all project requirements and confirm the deliverable format — slides, poster, video, or live",
+        "Write your research question or thesis before starting any slides",
+        "Gather all required sources and take notes organized by your talking points",
+        "Build your outline — each section of the presentation as its own row",
+        "Create slides or display with one idea per slide — visuals support speech, not replace it",
+        "Write speaker notes or talking points for each slide",
+        "Practice out loud at least twice — once for content, once for timing",
+        "Time yourself — confirm you are within the required window",
+        "Prepare for 2-3 likely questions from the audience",
+        "Rubric check — confirm all required components are present",
+        "Submit written component if required and organize materials for presentation day"
+      ],
+      "advanced": [
+        "Read all project requirements — clarify deliverable, evaluation criteria, and timing",
+        "Develop a specific research question and thesis before any research",
+        "Conduct timed research — log all sources as you go",
+        "Build a content outline organized around claims, not slides",
+        "Design slides or display — one claim per slide, data visualized not listed",
+        "Write and practice spoken introduction — practice three times and time it",
+        "Prepare responses to the 4-5 most likely challenging questions",
+        "Record yourself presenting once and review",
+        "Rubric audit — every criterion confirmed",
+        "Submit written materials if required",
+        "Confirm presentation logistics — time, location, technology setup"
+      ]
+    },
+    "group": {
+      "high_school": [
+        "Read the full requirements as a group — confirm the final deliverable and individual responsibilities",
+        "Assign specific roles and tasks to each group member in writing",
+        "Set internal deadlines at least two days before the actual due date",
+        "Complete your individual section without waiting on others",
+        "Combine sections and review for consistency of format and argument",
+        "Practice the presentation as a complete group at least once",
+        "Rubric check as a group — confirm every requirement is met",
+        "Submit all required components"
+      ],
+      "advanced": [
+        "Clarify all requirements as a group on day one — document who does what",
+        "Create a shared document with your project structure and everyone's assigned sections",
+        "Set an internal deadline 3 days before the actual due date to allow revision",
+        "Each member completes their section independently to the internal deadline",
+        "Review all sections together — ensure argument consistency and equal contribution",
+        "Rehearse as a group — each member practices their portion out loud",
+        "Full group rubric audit",
+        "Submit all required components and confirm logistics for presentation"
+      ]
+    }
+  },
+
+  "discussion_post": {
+    "general": {
+      "high_school": [
+        "Get the text the discussion is based on and read the prompt carefully",
+        "Write your position on the prompt in one or two sentences before doing anything else",
+        "Find 2 specific pieces of evidence from the text that support your position",
+        "Write one genuine open-ended question you want the class to discuss",
+        "Write your post: position, evidence with page number, analysis, closing question",
+        "Write at least one reply to a classmate that engages with their argument specifically",
+        "Check word count and format requirements",
+        "Submit"
+      ],
+      "advanced": [
+        "Create a prep sheet with four sections: Position, Evidence, Questions, Counterarguments",
+        "Write your specific arguable position before reading other posts",
+        "Gather 3-4 pieces of evidence with spoken introduction language prepared",
+        "Write two questions — one open, one deliberately provocative",
+        "Anticipate 2-3 counterpositions and write responses",
+        "Write your initial post — argument not summary, specific evidence, closing question",
+        "Write a substantive reply that extends or challenges a classmate's specific argument",
+        "Check all requirements and submit"
+      ]
+    }
+  },
+
+  "worksheet": {
+    "general": {
+      "high_school": [
+        "Get the worksheet and your class notes from the relevant unit",
+        "Read through the entire worksheet before starting any questions",
+        "Answer every question you know immediately — skip and mark the ones you don't",
+        "Go back to skipped questions and use your notes to find relevant information",
+        "For any question still unanswered: write your best attempt and a note about what confused you",
+        "Review all answers for completeness — confirm you answered what was asked",
+        "Label with name and submit"
+      ],
+      "advanced": [
+        "Preview the full worksheet — identify which questions are recall, which are application, and which are analysis",
+        "Complete all recall questions first from memory",
+        "Work through application questions using class notes and examples",
+        "For analysis questions: write your reasoning step by step, not just the answer",
+        "Check all answers against the question — confirm you addressed every part",
+        "Submit"
+      ]
+    }
+  },
+
+  "creative": {
+    "writing": {
+      "high_school": [
+        "Read the prompt carefully — identify genre, required elements, and length",
+        "Free write for 8 minutes without editing — follow any idea that interests you",
+        "Identify the most specific or interesting moment in your free write",
+        "Write a brief outline — beginning, middle, turning point, ending",
+        "Write a complete first draft without stopping to edit",
+        "BREAK — 3-5 minutes",
+        "Read aloud — mark anything that feels generic or that doesn't work",
+        "Revise the marked sections — add sensory detail and specificity",
+        "Check required elements against the prompt",
+        "Final read and submit"
+      ],
+      "advanced": [
+        "Read the prompt and identify the creative constraint — what is required and what is your freedom?",
+        "Free write for 10 minutes — do not self-censor, follow the unexpected",
+        "Identify the strongest image, moment, or idea from the free write",
+        "Draft 3 possible opening lines — none of them starting with 'I'",
+        "Write a structural sketch — what is the movement or arc of this piece?",
+        "Write a complete first draft without revising",
+        "BREAK — 5 minutes",
+        "Read aloud — mark every generic word, passive construction, and stated emotion",
+        "Revise for specificity, compression, and voice — show, don't tell",
+        "Check that the ending is earned, not just concluded",
+        "Final prompt check and submit"
+      ]
+    }
+  },
+
+  "pre_lab": {
+    "general": {
+      "high_school": [
+        "Get the lab handout and open your lab notebook — write title and date",
+        "Read only the Background and Purpose sections — write what concept this lab tests",
+        "Write your hypothesis in If/Then/Because format before reading the procedure",
+        "Identify the Independent Variable, Dependent Variable, and at least 3 Controlled Variables",
+        "Read the safety section — write every hazard and required precaution",
+        "Read the full procedure — number each step, star any step you have a question about",
+        "Write all starred questions in your notebook to ask before the lab",
+        "Draw your complete data table with headers (with units) and all rows for every trial"
+      ],
+      "advanced": [
+        "Open lab notebook — write full heading per course requirements",
+        "Write background knowledge from memory before reading the handout",
+        "Read Background and Purpose — annotate every scientific term and the research question",
+        "Write a mechanistic, falsifiable hypothesis naming specific scientific principles",
+        "Operationalize all variables — include measurement instrument, units, and at least 5 controlled variables",
+        "Conduct full safety analysis — create a hazard table with PPE and emergency procedures",
+        "Read and annotate the procedure — mark timing-critical steps and precision-critical steps",
+        "Construct a multi-column data table with trial rows, mean rows, and qualitative observation space"
+      ]
+    }
+  },
+
+  "science_research": {
+    "general": {
+      "high_school": [
+        "Read all project requirements and build your milestone calendar today — put every milestone in your phone with reminders",
+        "Write at least 3 possible research questions and evaluate each for feasibility",
+        "Select the most specific, measurable, and feasible research question",
+        "Conduct timed background research — 45 minutes maximum, log every source",
+        "Write your hypothesis and complete experimental design — have teacher approve before collecting any data",
+        "Execute your experiment following the approved protocol — record data in real time",
+        "Take a full day away before beginning analysis",
+        "Calculate summary statistics and create all required graphs",
+        "Write your report in multiple focused sessions — one major section per session",
+        "Rubric check — every required component confirmed",
+        "Submit all components"
+      ],
+      "advanced": [
+        "Read requirements and build a full project management structure with milestone calendar the day it is assigned",
+        "Conduct systematic literature review — databases first, journals second, credible journalism third — timed sessions only",
+        "Develop and refine research question using four criteria: original, specific, feasible, gap-connected",
+        "Write full experimental protocol at replication level — get teacher approval before acquiring materials",
+        "Execute experiment following approved protocol exactly — document all deviations",
+        "Full day away before analysis — write initial impression of raw data pattern before calculating",
+        "Conduct full quantitative analysis including statistical testing with complete work shown",
+        "Write report in dedicated sessions across separate days — Discussion section requires the most time",
+        "Scientific integrity audit — confirm all claims are evidenced and results are reported honestly",
+        "Full rubric audit and submission requirements check",
+        "Submit all components and archive materials"
+      ]
+    }
+  },
+
+  "dbq_essay": {
+    "general": {
+      "high_school": [
+        "Set up workspace with only Document 1 visible — planning paper ready, phone away",
+        "Read the prompt before opening any document — write what it is asking in your own words",
+        "Process each document one at a time — write a one-sentence summary and one argument connection for each",
+        "Add HAPP notes to each document — author position and how it shaped the document",
+        "Look at all document notes together — identify the pattern and write 3 thesis candidates",
+        "Assign documents to paragraphs and add one piece of outside historical knowledge per paragraph",
+        "BREAK — 4-5 minutes before drafting",
+        "Write introduction — historical context, thesis last",
+        "Write each body paragraph — topic sentence, cited document with analysis, outside knowledge",
+        "Write conclusion — synthesized argument, historical significance",
+        "Rubric check — thesis, document use, outside knowledge, HAPP",
+        "Format and submit"
+      ],
+      "advanced": [
+        "Set up planning document with these sections: PROMPT DECONSTRUCTION, DOCUMENT NOTES, CONTEXTUALIZATION, THESIS DRAFTS, OUTSIDE KNOWLEDGE BANK, OUTLINE",
+        "Deconstruct the prompt — task verb, time period, reasoning skill, plain-language restatement",
+        "Process each document individually — content summary, argument connection, full HAPP, complexity potential",
+        "Write 3-5 sentences of contextualization reaching before the document period",
+        "Build outside knowledge bank — 6 minutes timed, write everything relevant from memory not in any document",
+        "Construct thesis from evidence — historically defensible, establishes a line of reasoning, not just descriptive",
+        "Build full outline with AP scoring elements mapped — contextualization, thesis, evidence, HAPP, complexity",
+        "BREAK — 6-8 minutes mandatory",
+        "Write introduction — contextualization paragraph plus thesis",
+        "Write each body paragraph — topic sentence, cited document, analysis, HAPP, outside knowledge",
+        "Write complexity paragraph — complicating evidence and how your thesis accounts for it",
+        "Write synthesis conclusion",
+        "AP rubric audit — verify every scoring point has a specific location in the essay",
+        "Format and submit"
+      ]
+    }
+  },
+
+  "civic_project": {
+    "general": {
+      "high_school": [
+        "Read all project requirements — confirm your role, deliverable, and deadline before anything else",
+        "Identify the specific constitutional provision, legal principle, or civic framework that applies to your role",
+        "Conduct timed research — 30 minutes maximum, log every source",
+        "Build your full position: claim, framework basis, evidence, counterargument, rebuttal",
+        "Write your required deliverable — every argument must cite its constitutional or civic basis",
+        "BREAK before oral preparation",
+        "Write speaking outline and practice your opening out loud at least twice",
+        "Prepare responses to 3-4 likely challenges to your position",
+        "Rubric check — all components present, arguments grounded in framework",
+        "Submit written components — confirm simulation logistics"
+      ],
+      "advanced": [
+        "Build a project management structure with milestone calendar the day it is assigned",
+        "Identify the constitutional provisions, court precedents, and procedural framework with precision",
+        "Conduct two-phase research — framework research then issue research, 30-minute timer for each",
+        "Develop a sophisticated civic argument with claim, constitutional basis, factual evidence, serious counterargument, and rebuttal",
+        "Write the formal deliverable in focused sessions — one major section per session",
+        "Civic argument audit — every claim grounded in constitutional or civic framework, counterarguments represented fairly",
+        "Prepare extensively for oral component — outline, three practice rounds, record yourself once",
+        "Full rubric audit — written and oral components confirmed",
+        "Submit all written components",
+        "Confirm simulation logistics and review speaking notes before sleeping"
+      ]
+    }
+  },
+
+  "current_events": {
+    "general": {
+      "high_school": [
+        "Choose a specific topic — write it as a focused question, not a broad subject",
+        "Read two sources about this event — one news report, one additional perspective",
+        "Write what the event is and what each source adds — before forming your opinion",
+        "Connect this event to something specific from class — name the concept, period, or principle",
+        "Write your response: summary paragraph, analysis paragraph, opinion paragraph if required",
+        "Check that summary stays factual and analysis goes beyond facts to significance",
+        "Add source URLs or titles at the bottom",
+        "Submit"
+      ],
+      "advanced": [
+        "Frame your topic as a specific arguable question",
+        "Read three sources — news report, analysis or opinion piece, and a different-perspective source",
+        "Note main claim, key evidence, and whose perspective is centered for each source",
+        "Identify the tension or debate across your sources — where do they agree and disagree?",
+        "Connect to specific course content and form your analytical claim before writing",
+        "Write a structured response — factual foundation, perspective analysis, course connection, significance conclusion",
+        "Unsupported claims audit — every position must be evidenced",
+        "Add citations and submit"
+      ]
+    }
+  }
+}
