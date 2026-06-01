@@ -1,4 +1,4 @@
-export type AssignmentType   = 'homework' | 'test' | 'quiz' | 'project' | 'other'
+export type AssignmentType   = 'homework' | 'test' | 'quiz' | 'project' | 'task' | 'other'
 export type AssignmentEffort = 'quick' | 'medium' | 'long' | null
 
 export interface Subtask {

@@ -178,8 +178,7 @@ export default function TodayScreen() {
   return (
     <>
       <QuickLaunch
-        onAdd={(type) => {
-          try { sessionStorage.setItem('trackit_add_type', type); } catch {}
+        onAdd={() => {
           navigate('add');
         }}
         onFocus={handleQuickFocus}
