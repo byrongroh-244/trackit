@@ -227,7 +227,7 @@ export default function ClassesScreen() {
 
           {/* Canvas banner — sync button if connected, connect prompt if not */}
           <div style={{ margin: '14px 14px 6px', background: Colors.tealLight, border: `1.5px solid ${Colors.teal}28`, borderRadius: 18, overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+            <div onClick={() => navigate('canvas')} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', cursor: 'pointer' }}>
               <div style={{ width: 42, height: 42, borderRadius: 11, background: Colors.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
