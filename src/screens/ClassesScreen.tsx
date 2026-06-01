@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../hooks/useApp';
-import { uid, daysUntil } from '../data/store';
+import { uid, daysUntil, fetchCanvasCourses, importFromCanvas } from '../data/store';
 import { Colors, CLASS_COLORS, SECTION_META, getSectionForDays, getSubjectIconPaths, type Section } from '../theme';
 import AssignmentCard from '../components/AssignmentCard';
 import { Screen, ScrollBody, BottomNav, SectionLabel, EmptyState, ConfirmSheet } from '../components/UI';
@@ -35,8 +35,38 @@ function ClassIcon({ name, color, size = 44 }: { name: string; color: string; si
 }
 
 export default function ClassesScreen() {
-  const { courses, assignments, updateCourses, updateAssignments, navigate, patchAssignment } = useApp();
+  const { courses, assignments, settings, updateCourses, updateAssignments, upsertAssignments, navigate, patchAssignment } = useApp();
   const [adding,        setAdding]        = useState(false);
+  const [syncing,       setSyncing]       = useState(false);
+  const [syncMsg,       setSyncMsg]       = useState('');
+
+  const canvasDomain = (() => { try { return localStorage.getItem('trackit_canvas_domain') ?? ''; } catch { return ''; } })();
+  const canvasToken  = (() => { try { return localStorage.getItem('trackit_canvas_token')  ?? ''; } catch { return ''; } })();
+  const canvasIds    = (() => { try { return JSON.parse(localStorage.getItem('trackit_canvas_selected_ids') ?? '[]') as number[]; } catch { return [] as number[]; } })();
+  const canvasConnected = !!(canvasDomain && canvasToken);
+
+  async function quickSync() {
+    if (!canvasDomain || !canvasToken) { navigate('canvas'); return; }
+    setSyncing(true); setSyncMsg('');
+    try {
+      const result = await importFromCanvas(
+        canvasDomain, canvasToken,
+        courses.map(c => c.color), CLASS_COLORS,
+        settings?.gradeLevel ?? '',
+        canvasIds.length > 0 ? canvasIds : undefined,
+      );
+      const existingNames = new Set(courses.map(c => c.name.toLowerCase().trim()));
+      const freshCourses  = result.courses.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
+      await updateCourses([...courses, ...freshCourses]);
+      await upsertAssignments(result.assignments);
+      setSyncMsg(`Synced ${result.assignments.length} assignment${result.assignments.length !== 1 ? 's' : ''}`);
+      setTimeout(() => setSyncMsg(''), 3000);
+    } catch (err: any) {
+      setSyncMsg('Sync failed — check Canvas settings');
+    } finally {
+      setSyncing(false);
+    }
+  }
   const [newName,       setNewName]       = useState('');
   const [selectedColor, setSelectedColor] = useState<string>(CLASS_COLORS[0]);
   const [selectedClass, setSelectedClass] = useState<Course | null>(null);
@@ -195,26 +225,57 @@ export default function ClassesScreen() {
 
         <ScrollBody hasNav>
 
-          {/* Canvas connect banner */}
-          <div
-            onClick={() => navigate('canvas')}
-            style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '14px 14px 6px', padding: '14px 16px', background: Colors.tealLight, border: `1.5px solid ${Colors.teal}28`, borderRadius: 18, cursor: 'pointer', transition: 'opacity 0.15s' }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-          >
-            <div style={{ width: 42, height: 42, borderRadius: 11, background: Colors.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
+          {/* Canvas banner — sync button if connected, connect prompt if not */}
+          <div style={{ margin: '14px 14px 6px', background: Colors.tealLight, border: `1.5px solid ${Colors.teal}28`, borderRadius: 18, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+              <div style={{ width: 42, height: 42, borderRadius: 11, background: Colors.teal, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: Colors.tealDark }}>
+                  {canvasConnected ? canvasDomain : 'Connect Canvas'}
+                </div>
+                <div style={{ fontSize: 12, color: Colors.tealDark, marginTop: 2, opacity: 0.75 }}>
+                  {syncMsg || (canvasConnected ? `${canvasIds.length || 'All'} course${canvasIds.length !== 1 ? 's' : ''} selected` : 'Auto-import courses and assignments')}
+                </div>
+              </div>
+              {canvasConnected ? (
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  {/* Quick sync button */}
+                  <button
+                    onClick={quickSync}
+                    disabled={syncing}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: 'none', background: syncing ? Colors.grayLight : Colors.teal, color: syncing ? Colors.textHint : '#fff', fontSize: 13, fontWeight: 700, cursor: syncing ? 'default' : 'pointer', fontFamily: 'inherit' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
+                      <polyline points="23 4 23 10 17 10"/>
+                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    {syncing ? 'Syncing…' : 'Sync'}
+                  </button>
+                  {/* Settings link */}
+                  <button
+                    onClick={() => navigate('canvas')}
+                    style={{ width: 34, height: 34, borderRadius: 9, border: 'none', background: `${Colors.teal}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={Colors.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => navigate('canvas')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                  <IconChevronRight size={18} color={Colors.teal} />
+                </button>
+              )}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: Colors.tealDark }}>Connect Canvas</div>
-              <div style={{ fontSize: 12, color: Colors.tealDark, marginTop: 2, opacity: 0.75 }}>Auto-import all your courses and assignments</div>
-            </div>
-            <IconChevronRight size={18} color={Colors.teal} />
           </div>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
           {/* Section label */}
           <div style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '14px 18px 8px' }}>

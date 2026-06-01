@@ -1,218 +1,326 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
-import { importFromCanvas } from '../data/store';
+import { fetchCanvasCourses, importFromCanvas, type CanvasCourse } from '../data/store';
 import { Colors, CLASS_COLORS } from '../theme';
-import { Screen, ScrollBody, SaveButton, Field, TextInput } from '../components/UI';
-import { IconCircleCheck, IconArrowLeft } from '../components/Icons';
+import { Screen, ScrollBody, useToast } from '../components/UI';
+import { IconCircleCheck, IconArrowLeft, IconLoader } from '../components/Icons';
 
-const CANVAS_DOMAIN_KEY = 'trackit_canvas_domain';
-const CANVAS_TOKEN_KEY  = 'trackit_canvas_token';
+const DOMAIN_KEY = 'trackit_canvas_domain';
+const TOKEN_KEY  = 'trackit_canvas_token';
+const SELECTED_KEY = 'trackit_canvas_selected_ids';
 
-function loadSaved(): { domain: string; token: string } {
-  try {
-    return {
-      domain: localStorage.getItem(CANVAS_DOMAIN_KEY) ?? '',
-      token:  localStorage.getItem(CANVAS_TOKEN_KEY)  ?? '',
-    };
-  } catch { return { domain: '', token: '' }; }
-}
-function saveCredentials(domain: string, token: string) {
-  try { localStorage.setItem(CANVAS_DOMAIN_KEY, domain); localStorage.setItem(CANVAS_TOKEN_KEY, token); } catch {}
-}
-function clearCredentials() {
-  try { localStorage.removeItem(CANVAS_DOMAIN_KEY); localStorage.removeItem(CANVAS_TOKEN_KEY); } catch {}
-}
+function load(key: string) { try { return localStorage.getItem(key) ?? ''; } catch { return ''; } }
+function save(key: string, val: string) { try { localStorage.setItem(key, val); } catch {} }
 
-type Status = 'idle' | 'loading' | 'success' | 'error';
+type Stage = 'form' | 'selecting' | 'syncing' | 'success' | 'error';
 
 export default function CanvasScreen() {
-  const { courses, navigate, updateCourses, upsertAssignments } = useApp();
+  const { courses, navigate, updateCourses, upsertAssignments, settings } = useApp();
+  const { showToast } = useToast();
 
-  const saved = loadSaved();
-  const [domain,   setDomain]   = useState(saved.domain);
-  const [token,    setToken]    = useState(saved.token);
-  const [status,   setStatus]   = useState<Status>('idle');
-  const [message,  setMessage]  = useState('');
-  const [imported, setImported] = useState({ courses: 0, assignments: 0 });
+  const savedDomain = load(DOMAIN_KEY);
+  const savedToken  = load(TOKEN_KEY);
+  const savedIds    = (() => { try { return JSON.parse(load(SELECTED_KEY)) as number[]; } catch { return [] as number[]; } })();
 
-  const isReconnecting = !!saved.domain && !!saved.token;
+  const [domain,      setDomain]      = useState(savedDomain);
+  const [token,       setToken]       = useState(savedToken);
+  const [stage,       setStage]       = useState<Stage>(savedDomain && savedToken ? 'selecting' : 'form');
+  const [message,     setMessage]     = useState('');
+  const [canvasCourses, setCanvasCourses] = useState<CanvasCourse[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>(savedIds);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [imported,    setImported]    = useState({ courses: 0, assignments: 0 });
+  const gradeLevel = settings.gradeLevel ?? '';
 
-  async function connect() {
-    if (!domain.trim() || !token.trim()) {
-      setStatus('error'); setMessage('Please enter your Canvas URL and access token.'); return;
+  // Auto-load courses if we have saved credentials
+  useEffect(() => {
+    if (savedDomain && savedToken) {
+      loadCourses(savedDomain, savedToken);
     }
-    setStatus('loading'); setMessage('');
+  }, []); // eslint-disable-line
+
+  async function loadCourses(d = domain, t = token) {
+    if (!d.trim() || !t.trim()) { setMessage('Please enter your Canvas URL and token.'); setStage('error'); return; }
+    setLoadingCourses(true); setMessage('');
     try {
-      const result = await importFromCanvas(domain.trim(), token.trim(), courses.map(c => c.color), CLASS_COLORS);
-      saveCredentials(domain.trim(), token.trim());
-      updateCourses([...courses, ...result.courses]);
-      upsertAssignments(result.assignments);
-      setImported({ courses: result.courses.length, assignments: result.assignments.length });
-      setStatus('success');
+      const list = await fetchCanvasCourses(d.trim(), t.trim());
+      save(DOMAIN_KEY, d.trim()); save(TOKEN_KEY, t.trim());
+      setCanvasCourses(list);
+      // Pre-select all if nothing saved yet
+      if (savedIds.length === 0) setSelectedIds(list.map(c => c.id));
+      setStage('selecting');
     } catch (err: any) {
-      setStatus('error');
-      setMessage(err.message ?? 'Connection failed. Check your URL and token.');
+      setMessage(err.message ?? 'Could not connect. Check your URL and token.');
+      setStage('error');
+    } finally {
+      setLoadingCourses(false);
     }
   }
 
-  function disconnect() {
-    if (!window.confirm('Remove your saved Canvas credentials? Your imported assignments will stay.')) return;
-    clearCredentials(); setDomain(''); setToken(''); setStatus('idle');
+  async function sync() {
+    if (selectedIds.length === 0) { showToast('Select at least one course.', 'error'); return; }
+    setStage('syncing');
+    try {
+      save(SELECTED_KEY, JSON.stringify(selectedIds));
+      const result = await importFromCanvas(
+        domain.trim(), token.trim(),
+        courses.map(c => c.color), CLASS_COLORS,
+        gradeLevel,
+        selectedIds,
+      );
+      // Names of all Canvas courses (all of them, not just selected)
+      const allCanvasNames = new Set(canvasCourses.map(c => c.name.toLowerCase().trim()));
+      // Names of selected courses only
+      const selectedNames  = new Set(
+        canvasCourses.filter(c => selectedIds.includes(c.id)).map(c => c.name.toLowerCase().trim())
+      );
+      // Remove courses that came from Canvas but are not in the current selection
+      const prunedCourses = courses.filter(c => {
+        const nameLower = c.name.toLowerCase().trim();
+        // Keep if it was never a Canvas course, or if it is in the selected set
+        return !allCanvasNames.has(nameLower) || selectedNames.has(nameLower);
+      });
+      // Add any newly selected courses not already in the list
+      const existingNames = new Set(prunedCourses.map(c => c.name.toLowerCase().trim()));
+      const freshCourses  = result.courses.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
+      // Await courses first — assignments have a FK constraint on class_id
+      await updateCourses([...prunedCourses, ...freshCourses]);
+      await upsertAssignments(result.assignments);
+      setImported({ courses: freshCourses.length, assignments: result.assignments.length });
+      setStage('success');
+    } catch (err: any) {
+      setMessage(err.message ?? 'Sync failed.');
+      setStage('error');
+    }
   }
 
-  // ── Success state ──
-  if (status === 'success') {
-    return (
-      <Screen>
-        <div style={{ background: Colors.forest, padding: '22px 20px 18px', flexShrink: 0 }}>
-          <button onClick={() => navigate('today')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
-          </button>
-        </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 40, textAlign: 'center' }}>
-          <div style={{ width: 72, height: 72, borderRadius: '50%', background: Colors.teal, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconCircleCheck size={36} color="#fff" strokeWidth={2.5} />
-          </div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: Colors.textPrimary, margin: 0, letterSpacing: '-0.03em' }}>Canvas connected!</h2>
-          <p style={{ color: Colors.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.5 }}>
-            Imported {imported.courses} course{imported.courses !== 1 ? 's' : ''} and {imported.assignments} assignment{imported.assignments !== 1 ? 's' : ''}.
-          </p>
-          <p style={{ color: Colors.textHint, fontSize: 12, margin: 0 }}>
-            Your credentials are saved — you won't need to re-enter them.
-          </p>
-          <SaveButton label="View my assignments" onClick={() => navigate('today')} color={Colors.forest} />
-        </div>
-      </Screen>
-    );
+  function toggleCourse(id: number) {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
+  function selectAll() { setSelectedIds(canvasCourses.map(c => c.id)); }
+  function selectNone() { setSelectedIds([]); }
 
-  // ── Loading state ──
-  if (status === 'loading') {
-    return (
-      <Screen>
-        <div style={{ background: Colors.forest, padding: '22px 20px 18px', flexShrink: 0 }}>
-          <button onClick={() => navigate('add')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
-          </button>
-        </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: Colors.textSecondary, fontSize: 15 }}>
-          <div style={{ width: 48, height: 48, borderRadius: '50%', background: Colors.tealLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={Colors.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-              <polyline points="15 3 21 3 21 9"/>
-              <line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-          </div>
-          Connecting to Canvas…
-        </div>
-      </Screen>
-    );
-  }
+  const isReconnecting = !!savedDomain && !!savedToken;
 
-  // ── Main form ──
-  return (
+  // ── Success ──────────────────────────────────────────────────────────────────
+  if (stage === 'success') return (
     <Screen>
-      {/* Dark forest header */}
-      <div style={{ background: Colors.forest, padding: '22px 20px 18px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button
-            onClick={() => navigate('add')}
-            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-          >
+      <div style={{ background: Colors.forest, padding: '18px 20px 18px', flexShrink: 0 }}>
+        <button onClick={() => navigate('today')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
+        </button>
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 40, textAlign: 'center' }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#D9F5E5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <IconCircleCheck size={36} color="#1E8A55" />
+        </div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, color: Colors.textPrimary, margin: 0, letterSpacing: '-0.03em' }}>Synced!</h2>
+        <p style={{ color: Colors.textSecondary, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
+          {imported.courses > 0 && `Added ${imported.courses} new course${imported.courses !== 1 ? 's' : ''}. `}
+          Imported {imported.assignments} assignment{imported.assignments !== 1 ? 's' : ''} from {selectedIds.length} course{selectedIds.length !== 1 ? 's' : ''}.
+        </p>
+        <button onClick={() => navigate('today')} style={{ width: '100%', maxWidth: 300, padding: '15px', borderRadius: 14, border: 'none', background: Colors.forest, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          View agenda
+        </button>
+        <button onClick={() => setStage('selecting')} style={{ background: 'none', border: 'none', color: Colors.textHint, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Sync again
+        </button>
+      </div>
+    </Screen>
+  );
+
+  // ── Syncing spinner ───────────────────────────────────────────────────────────
+  if (stage === 'syncing') return (
+    <Screen>
+      <div style={{ background: Colors.forest, padding: '18px 20px 18px', flexShrink: 0 }}>
+        <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', paddingTop: 6 }}>Syncing Canvas…</div>
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+        <div style={{ color: Colors.forest }}><IconLoader size={44} /></div>
+        <p style={{ fontSize: 14, color: Colors.textSecondary, margin: 0 }}>Fetching assignments from {selectedIds.length} course{selectedIds.length !== 1 ? 's' : ''}…</p>
+      </div>
+    </Screen>
+  );
+
+  // ── Course selection ──────────────────────────────────────────────────────────
+  if (stage === 'selecting') return (
+    <Screen>
+      <div style={{ background: Colors.forest, padding: '18px 20px 18px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <button onClick={() => navigate('add')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
             <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
           </button>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>
-            {isReconnecting ? 'Canvas connected' : 'Connect Canvas'}
-          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>Select courses</div>
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', paddingLeft: 44 }}>
+          {domain} · {canvasCourses.length} active course{canvasCourses.length !== 1 ? 's' : ''}
         </div>
       </div>
 
       <ScrollBody>
-        <div style={{ padding: '24px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* Icon */}
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{ width: 64, height: 64, borderRadius: 18, background: Colors.tealLight, border: '1.5px solid #E3EBEA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={Colors.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-            </div>
+        <div style={{ padding: '14px 16px' }}>
+          {/* Select all / none */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <button onClick={selectAll} style={{ background: 'none', border: 'none', color: Colors.forest, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+              Select all
+            </button>
+            <span style={{ color: Colors.textHint, fontSize: 13 }}>·</span>
+            <button onClick={selectNone} style={{ background: 'none', border: 'none', color: Colors.textHint, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+              Deselect all
+            </button>
+            <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: Colors.textSecondary }}>
+              {selectedIds.length} selected
+            </span>
           </div>
 
-          <p style={{ fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 1.55, margin: 0 }}>
-            {isReconnecting
-              ? 'Re-sync to import the latest assignments from Canvas.'
-              : 'Import all your courses and assignments automatically.'}
-          </p>
+          {/* Course list */}
+          <div style={{ background: '#fff', borderRadius: 18, border: '1.5px solid #E3EBEA', overflow: 'hidden' }}>
+            {canvasCourses.map((c, i) => {
+              const checked = selectedIds.includes(c.id);
+              return (
+                <div
+                  key={c.id}
+                  onClick={() => toggleCourse(c.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '13px 16px',
+                    borderBottom: i < canvasCourses.length - 1 ? '0.5px solid #E3EBEA' : 'none',
+                    cursor: 'pointer', transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = Colors.background)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {/* Checkbox */}
+                  <div style={{
+                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                    border: `2px solid ${checked ? Colors.forest : 'rgba(0,0,0,0.2)'}`,
+                    background: checked ? Colors.forest : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s',
+                  }}>
+                    {checked && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B8E04A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.name}
+                    </div>
+                    {c.course_code && c.course_code !== c.name && (
+                      <div style={{ fontSize: 11, color: Colors.textHint, marginTop: 1 }}>{c.course_code}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-          {/* Saved connection badge */}
-          {isReconnecting && (
-            <div style={{ background: Colors.tealLight, border: '1.5px solid #E3EBEA', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Credentials section */}
+          <div style={{ marginTop: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+              Connected to
+            </div>
+            <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #E3EBEA', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: Colors.tealDark }}>Saved connection</div>
-                <div style={{ fontSize: 12, color: Colors.teal, marginTop: 2 }}>{domain}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: Colors.textPrimary }}>{domain}</div>
+                <div style={{ fontSize: 12, color: Colors.textHint, marginTop: 1 }}>Token saved</div>
               </div>
-              <button onClick={disconnect} style={{ background: 'none', border: 'none', fontSize: 12, color: Colors.red, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+              <button
+                onClick={() => { save(DOMAIN_KEY, ''); save(TOKEN_KEY, ''); setDomain(''); setToken(''); setCanvasCourses([]); setStage('form'); }}
+                style={{ background: 'none', border: 'none', fontSize: 12, color: Colors.red, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+              >
                 Disconnect
               </button>
             </div>
-          )}
+          </div>
 
-          {/* How-to steps */}
-          {!isReconnecting && (
-            <div style={{ background: '#fff', border: '1.5px solid #E3EBEA', borderRadius: 18, padding: 18 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: Colors.textPrimary, marginBottom: 14, letterSpacing: '-0.01em' }}>
-                How to get your Canvas token
-              </div>
-              {[
-                'Open Canvas and go to Account → Settings',
-                'Scroll to "Approved Integrations" and click "+ New Access Token"',
-                'Name it "TrackIt" and copy the token shown',
-              ].map((step, i) => (
-                <div key={i} style={{ display: 'flex', gap: 12, marginBottom: i < 2 ? 12 : 0, alignItems: 'flex-start' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: Colors.forest, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                    {i + 1}
-                  </div>
-                  <div style={{ fontSize: 13, color: Colors.textSecondary, lineHeight: 1.5, flex: 1, paddingTop: 2 }}>{step}</div>
-                </div>
-              ))}
+          {/* Sync button */}
+          <button
+            onClick={sync}
+            disabled={selectedIds.length === 0}
+            style={{
+              width: '100%', marginTop: 20, padding: '15px', borderRadius: 14, border: 'none',
+              background: selectedIds.length > 0 ? Colors.forest : Colors.grayLight,
+              color: selectedIds.length > 0 ? '#fff' : Colors.textHint,
+              fontSize: 15, fontWeight: 800, cursor: selectedIds.length > 0 ? 'pointer' : 'default',
+              fontFamily: 'inherit', letterSpacing: '-0.01em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={selectedIds.length > 0 ? '#B8E04A' : Colors.textHint} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Sync {selectedIds.length > 0 ? `${selectedIds.length} course${selectedIds.length !== 1 ? 's' : ''}` : ''}
+          </button>
+        </div>
+      </ScrollBody>
+    </Screen>
+  );
+
+  // ── Form (enter credentials) ──────────────────────────────────────────────────
+  return (
+    <Screen>
+      <div style={{ background: Colors.forest, padding: '18px 20px 18px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate('add')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
+          </button>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>Connect Canvas</div>
+        </div>
+      </div>
+
+      <ScrollBody>
+        <div style={{ padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* How-to */}
+          <div style={{ background: '#fff', border: '1.5px solid #E3EBEA', borderRadius: 18, padding: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: Colors.textPrimary, marginBottom: 14, letterSpacing: '-0.01em' }}>
+              How to get your Canvas token
             </div>
-          )}
+            {['Open Canvas → Account → Settings', 'Scroll to "Approved Integrations" → "+ New Access Token"', 'Name it "TrackIt" and copy the token'].map((step, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, marginBottom: i < 2 ? 12 : 0, alignItems: 'flex-start' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: Colors.forest, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {i + 1}
+                </div>
+                <div style={{ fontSize: 13, color: Colors.textSecondary, lineHeight: 1.5, flex: 1, paddingTop: 2 }}>{step}</div>
+              </div>
+            ))}
+          </div>
 
-          <Field label="Canvas URL">
-            <TextInput
-              value={domain}
-              onChange={e => setDomain(e.target.value)}
-              placeholder="university.instructure.com"
-              autoCapitalize="none"
-            />
-          </Field>
+          {/* Inputs */}
+          {[
+            { label: 'Canvas URL', value: domain, set: setDomain, placeholder: 'university.instructure.com', type: 'text' },
+            { label: 'Access token', value: token, set: setToken, placeholder: 'Paste your token here', type: 'password' },
+          ].map(f => (
+            <div key={f.label}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 7 }}>{f.label}</label>
+              <input
+                type={f.type} value={f.value} onChange={e => f.set(e.target.value)}
+                placeholder={f.placeholder}
+                style={{ width: '100%', fontSize: 15, padding: '13px 14px', borderRadius: 12, border: '1.5px solid #E3EBEA', outline: 'none', fontFamily: 'inherit', color: Colors.textPrimary, background: '#fff', boxSizing: 'border-box' }}
+              />
+            </div>
+          ))}
 
-          <Field label="Access token">
-            <TextInput
-              type="password"
-              value={token}
-              onChange={e => setToken(e.target.value)}
-              placeholder={isReconnecting ? '••••••••••••••••' : 'Paste your token here'}
-            />
-          </Field>
-
-          {status === 'error' && (
+          {(stage === 'error') && message && (
             <div style={{ padding: '10px 14px', borderRadius: 10, background: Colors.redLight, border: `1px solid ${Colors.red}30`, fontSize: 13, color: Colors.red, lineHeight: 1.5 }}>
               {message}
             </div>
           )}
 
-          <SaveButton
-            label={isReconnecting ? 'Re-sync Canvas' : 'Connect Canvas'}
-            onClick={connect}
-            color={Colors.forest}
-          />
+          <button
+            onClick={() => loadCourses()}
+            disabled={loadingCourses || !domain.trim() || !token.trim()}
+            style={{ width: '100%', padding: '15px', borderRadius: 14, border: 'none', background: domain.trim() && token.trim() ? Colors.forest : Colors.grayLight, color: domain.trim() && token.trim() ? '#fff' : Colors.textHint, fontSize: 15, fontWeight: 700, cursor: domain.trim() && token.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}
+          >
+            {loadingCourses ? 'Connecting…' : 'Connect & choose courses'}
+          </button>
 
           <p style={{ fontSize: 12, color: Colors.textHint, textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
-            Your token is saved locally on this device and never sent to our servers.
+            Your token is saved locally and never sent to our servers.
           </p>
         </div>
       </ScrollBody>

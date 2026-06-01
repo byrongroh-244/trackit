@@ -40,7 +40,7 @@ function toDbAssignment(a: Assignment, uid: string) {
   //     ADD COLUMN IF NOT EXISTS communications jsonb   DEFAULT '[]';
   return {
     id: a.id, user_id: uid, name: a.name,
-    class_id: a.classId || null, class_name: a.className, class_color: a.classColor,
+    class_id: null, class_name: a.className, class_color: a.classColor,
     due_date: a.dueDate, done: a.done, notes: a.notes ?? '',
     type: a.type ?? 'homework', subtasks: a.subtasks ?? [],
   };
@@ -91,7 +91,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase.from('settings').select('*').eq('user_id', uid).maybeSingle(),
     ]);
     if (cData) setCourses(cData.map(fromDbCourse));
-    if (aData) setAssignments(aData.map(fromDbAssignment));
+    if (aData) {
+      // Deduplicate on load — remove any duplicates by name+dueDate+className keeping latest
+      const seen = new Map<string, any>();
+      for (const row of aData) {
+        const key = `${row.name}||${row.due_date}||${row.class_name}`;
+        if (!seen.has(key)) seen.set(key, row);
+      }
+      setAssignments(Array.from(seen.values()).map(fromDbAssignment));
+    }
     if (sData) {
       const s: AppSettings = {
         agendaLookaheadDays:  sData.agenda_lookahead_days  ?? 0,
@@ -165,17 +173,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const upsertAssignments = useCallback(async (added: Assignment[]) => {
     if (added.length === 0) return;
 
-    setAssignments(prev => [...prev, ...added]);
+    setAssignments(prev => {
+      const existingKeys = new Set(prev.map(a => `${a.name}||${a.dueDate}||${a.className}`));
+      const fresh = added.filter(a => !existingKeys.has(`${a.name}||${a.dueDate}||${a.className}`));
+      return [...prev, ...fresh];
+    });
 
-    const uid = userIdRef.current;
-    if (!uid) { console.error('upsertAssignments: no userId'); return; }
+    // Wait up to 3s for userId if it hasn't resolved yet (e.g. right after Canvas sync)
+    let uid = userIdRef.current;
+    if (!uid) {
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        uid = userIdRef.current;
+        if (uid) break;
+      }
+    }
+    if (!uid) { console.error('upsertAssignments: no userId after wait'); return; }
 
-    const { error } = await supabase
+    // Deduplicate against existing assignments by name+dueDate+className
+    // so re-syncing Canvas never creates duplicates
+    const { data: existing } = await supabase
       .from('assignments')
-      .insert(added.map(a => toDbAssignment(a, uid)));
+      .select('name, due_date, class_name')
+      .eq('user_id', uid!);
 
-    if (error) {
-      console.error('upsertAssignments Supabase error:', JSON.stringify(error));
+    const existingKeys = new Set(
+      (existing ?? []).map((r: any) => `${r.name}||${r.due_date}||${r.class_name}`)
+    );
+
+    const fresh = added.filter(a =>
+      !existingKeys.has(`${a.name}||${a.dueDate}||${a.className}`)
+    );
+
+    if (fresh.length === 0) {
+      console.log('upsertAssignments: no new assignments to insert');
+      return;
+    }
+
+    // Insert fresh records in batches of 20
+    for (let i = 0; i < fresh.length; i += 20) {
+      const batch = fresh.slice(i, i + 20);
+      const rows  = batch.map(a => toDbAssignment(a, uid!));
+      const { error } = await supabase
+        .from('assignments')
+        .insert(rows);
+      if (error) console.error('upsertAssignments error:', error.code, error.message);
     }
   }, []);
 
@@ -183,14 +225,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateCourses = useCallback(async (updated: Course[]) => {
     setCourses(updated);
 
-    const uid = userIdRef.current;
-    if (!uid) return;
+    let uid = userIdRef.current;
+    if (!uid) {
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        uid = userIdRef.current;
+        if (uid) break;
+      }
+    }
+    if (!uid) { console.error('updateCourses: no userId'); return; }
 
-    const { error } = await supabase
+    // Delete removed courses, upsert remaining
+    const { error: delErr } = await supabase
       .from('courses')
-      .upsert(updated.map(c => toDbCourse(c, uid)));
+      .delete()
+      .eq('user_id', uid)
+      .not('id', 'in', `(${updated.map(c => `"${c.id}"`).join(',')})`);
+    if (delErr) console.error('updateCourses delete:', delErr);
 
-    if (error) console.error('updateCourses:', error);
+    if (updated.length > 0) {
+      const rows = updated.map(c => toDbCourse(c, uid!));
+      const { error } = await supabase
+        .from('courses')
+        .upsert(rows);
+      if (error) console.error('updateCourses error:', error.code, error.message);
+    }
   }, []);
 
   // ── patchAssignment ────────────────────────────────────────────────────────

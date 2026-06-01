@@ -259,37 +259,68 @@ async function canvasFetch(domain: string, token: string, path: string): Promise
   return res.json();
 }
 
+export interface CanvasCourse {
+  id: number;
+  name: string;
+  course_code?: string;
+}
+
 export interface CanvasImportResult {
   courses: Course[];
   assignments: Assignment[];
 }
 
+/** Fetch all active Canvas courses — no arbitrary limit */
+export async function fetchCanvasCourses(domain: string, token: string): Promise<CanvasCourse[]> {
+  const clean = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
+  const data = await canvasFetch(clean, token, 'courses?enrollment_state=active&per_page=50');
+  if (!Array.isArray(data)) throw new Error('Unexpected response. Check your Canvas URL and token.');
+  return (data as any[]).map(c => ({
+    id:          c.id,
+    name:        c.name || c.course_code || `Course ${c.id}`,
+    course_code: c.course_code,
+  }));
+}
+
+/** Import assignments for selected courses only.
+ *  Uses no bucket filter and higher per_page so nothing is missed. */
 export async function importFromCanvas(
   domain: string,
   token: string,
   existingColors: string[],
   colorPalette: readonly string[],
   gradeLevel = '',
+  selectedCourseIds?: number[],   // if provided, only import these courses
 ): Promise<CanvasImportResult> {
   const clean = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
-  const canvasCourses = await canvasFetch(clean, token, 'courses?enrollment_state=active&per_page=20') as Array<{ id: number; name?: string; course_code?: string }>;
-  if (!Array.isArray(canvasCourses)) throw new Error('Unexpected response. Check your Canvas URL and token.');
+
+  // Fetch courses
+  const allCourses = await fetchCanvasCourses(domain, token);
+  const toImport   = selectedCourseIds
+    ? allCourses.filter(c => selectedCourseIds.includes(c.id))
+    : allCourses;
 
   const newCourses: Course[]         = [];
   const newAssignments: Assignment[] = [];
   const usedColors = new Set(existingColors);
 
-  for (let i = 0; i < Math.min(canvasCourses.length, 8); i++) {
-    const cc    = canvasCourses[i];
+  for (let i = 0; i < toImport.length; i++) {
+    const cc    = toImport[i];
     const color = colorPalette.find(c => !usedColors.has(c)) ?? colorPalette[i % colorPalette.length];
     usedColors.add(color);
-    const course: Course = { id: uid(), name: cc.name || cc.course_code || `Course ${i + 1}`, color };
+    const course: Course = { id: uid(), name: cc.name, color };
     newCourses.push(course);
     try {
-      const asgns = await canvasFetch(clean, token, `courses/${cc.id}/assignments?bucket=upcoming&per_page=15`) as Array<{ name: string; due_at?: string; description?: string }>;
+      // No bucket filter — gets all assignments including test/sandbox ones
+      // Higher per_page to avoid missing assignments in large courses
+      const asgns = await canvasFetch(clean, token,
+        `courses/${cc.id}/assignments?per_page=50&order_by=due_at`
+      ) as Array<{ name: string; due_at?: string; description?: string; submission_types?: string[] }>;
       if (!Array.isArray(asgns)) continue;
       for (const a of asgns) {
+        // Skip assignments with no due date or that are "not_graded" placeholders
         if (!a.due_at) continue;
+        if (a.submission_types?.includes('not_graded') && a.submission_types.length === 1) continue;
         const dueDate = a.due_at.split('T')[0];
         newAssignments.push({
           id: uid(), name: a.name,
@@ -298,10 +329,10 @@ export async function importFromCanvas(
           notes: (a.description ?? '').replace(/<[^>]*>/g, '').slice(0, 300),
           type: inferType(a.name),
           effort: null,
-          subtasks: await generateSubtasks(a.name, dueDate, gradeLevel),
+          subtasks: [],  // generated on first open via DetailScreen fallback
         });
       }
-    } catch { /* skip course */ }
+    } catch { /* skip course on error */ }
   }
   return { courses: newCourses, assignments: newAssignments };
 }
