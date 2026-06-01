@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../theme';
+import TrackItLogo from '../components/TrackItLogo';
 
 type Mode = 'login' | 'signup' | 'forgot';
 
@@ -81,21 +82,7 @@ export default function AuthScreen({ onAuth }: { onAuth: () => void }) {
     }}>
       {/* Logo mark */}
       <div style={{ marginBottom: 32, textAlign: 'center' }}>
-        <div style={{
-          width: 68, height: 68, borderRadius: 20,
-          background: '#B8E04A',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 16px',
-        }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={Colors.forest} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-            <line x1="3" y1="6" x2="3.01" y2="6"/>
-            <line x1="3" y1="12" x2="3.01" y2="12"/>
-            <line x1="3" y1="18" x2="3.01" y2="18"/>
-          </svg>
-        </div>
+        <TrackItLogo size={68} style={{ margin: '0 auto 16px' }} />
         <h1 style={{ fontSize: 28, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.04em' }}>TrackIt</h1>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '6px 0 0', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           {subs[mode]}

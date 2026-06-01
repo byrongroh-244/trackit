@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../hooks/useApp';
 import { uid } from '../data/store';
 import { Colors, CLASS_COLORS } from '../theme';
+import TrackItLogo from '../components/TrackItLogo';
 import type { Course } from '../types';
 import { IconChevronRight, IconCheck, IconX } from '../components/Icons';
 
@@ -41,21 +42,7 @@ function OnboardingShell({ step, total, children }: { step?: string; total?: num
     }}>
       {/* Forest header strip */}
       <div style={{ background: Colors.forest, padding: '48px 24px 28px' }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: 14,
-          background: '#B8E04A',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: 16,
-        }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={Colors.forest} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-            <line x1="3" y1="6" x2="3.01" y2="6"/>
-            <line x1="3" y1="12" x2="3.01" y2="12"/>
-            <line x1="3" y1="18" x2="3.01" y2="18"/>
-          </svg>
-        </div>
+        <TrackItLogo size={48} style={{ marginBottom: 16 }} />
         {step && (
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
             {step}
@@ -125,16 +112,7 @@ export default function OnboardingScreen({ isNewSemester = false, onComplete }: 
   if (step === 'welcome') {
     return (
       <div style={{ minHeight: '100vh', background: Colors.forest, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-        <div style={{ width: 80, height: 80, borderRadius: 24, background: '#B8E04A', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 28 }}>
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={Colors.forest} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-            <line x1="3" y1="6" x2="3.01" y2="6"/>
-            <line x1="3" y1="12" x2="3.01" y2="12"/>
-            <line x1="3" y1="18" x2="3.01" y2="18"/>
-          </svg>
-        </div>
+        <TrackItLogo size={80} style={{ marginBottom: 28 }} />
         <h1 style={{ fontSize: 32, fontWeight: 800, color: '#fff', margin: '0 0 12px', textAlign: 'center', letterSpacing: '-0.04em' }}>
           Welcome to TrackIt
         </h1>

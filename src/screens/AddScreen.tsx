@@ -4,6 +4,7 @@ import { uid, generateSubtasks, inferType } from '../data/store';
 import { Colors } from '../theme';
 import { Screen, ScrollBody, BottomNav, useToast } from '../components/UI';
 import { IconArrowLeft } from '../components/Icons';
+import TrackItLogo from '../components/TrackItLogo';
 import { ADD_TILES, AddTile, AddTileType } from '../components/addTiles';
 import ClassPicker from '../components/add/ClassPicker';
 import VoiceInput  from '../components/add/VoiceInput';
