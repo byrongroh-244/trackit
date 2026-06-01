@@ -1,8 +1,29 @@
 import { useRef, useState } from 'react';
 import { Colors } from '../../theme';
-import { IconLoader } from '../Icons';
+import { IconLoader, IconArrowLeft } from '../Icons';
 import type { AssignmentType, Course } from '../../types';
 import type { AppSettings } from '../../data/store';
+
+// ── Shared sub-page header ────────────────────────────────────────────────────
+function SubHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack: () => void }) {
+  return (
+    <div style={{ background: Colors.forest, padding: '18px 20px 20px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: subtitle ? 10 : 0 }}>
+        <button
+          onClick={onBack}
+          style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+        >
+          <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
+        </button>
+        <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>{title}</div>
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: 500, paddingLeft: 44 }}>{subtitle}</div>
+      )}
+    </div>
+  );
+}
+
 
 const SUPABASE_FUNCTION_URL = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/parse-assignment';
 const SUPABASE_ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
@@ -130,41 +151,48 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
   );
 
   if (status === 'idle') return (
-    <div style={{ padding: '0 18px 18px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <SubHeader title="Upload syllabus" subtitle="AI reads your PDF or photo" onBack={onCancel} />
+      <div style={{ padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: Colors.surface, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', marginBottom: 14 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: targetClass.color, flexShrink: 0 }} />
         <div style={{ fontSize: 13, color: Colors.textSecondary }}>Importing into <strong style={{ color: Colors.textPrimary }}>{targetClass.name}</strong></div>
       </div>
-      <div style={{ background: Colors.purpleLight, borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: Colors.purple, marginBottom: 4 }}>AI Syllabus Parser</div>
-        <div style={{ fontSize: 13, color: Colors.purpleDark, lineHeight: 1.5 }}>Upload a PDF or photo. AI extracts all assignments and due dates for you to confirm before saving. Text-based PDFs are processed faster and at lower cost.</div>
+      <div style={{ background: '#E8F4F5', borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: Colors.forest, marginBottom: 4 }}>AI Syllabus Parser</div>
+        <div style={{ fontSize: 13, color: Colors.forest, lineHeight: 1.5 }}>Upload a PDF or photo. AI extracts all assignments and due dates for you to confirm before saving. Text-based PDFs are processed faster and at lower cost.</div>
       </div>
       <input ref={fileRef} type="file" accept=".pdf,image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) parseFile(e.target.files[0]); }} />
-      <button onClick={() => fileRef.current?.click()} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1.5px dashed ${Colors.purple}`, background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: Colors.purple, fontFamily: 'inherit', marginBottom: 10 }}>
+      <button onClick={() => fileRef.current?.click()} style={{ width: '100%', padding: 14, borderRadius: 12, border: `1.5px dashed ${Colors.forest}`, background: 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: Colors.forest, fontFamily: 'inherit', marginBottom: 10 }}>
         Upload PDF or image
       </button>
-      <button onClick={onCancel} style={{ width: '100%', padding: 12, borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer', fontSize: 14, color: Colors.textSecondary, fontFamily: 'inherit' }}>← Back</button>
+      </div>
     </div>
   );
 
   if (status === 'parsing') return (
-    <div style={{ padding: '40px 18px', textAlign: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <SubHeader title="Reading syllabus…" onBack={onCancel} />
+      <div style={{ padding: '60px 18px', textAlign: 'center' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16, color: Colors.purple }}>
         <IconLoader size={40} />
       </div>
-      <div style={{ fontSize: 16, fontWeight: 500, color: Colors.textPrimary, marginBottom: 8 }}>Reading your syllabus...</div>
-      <div style={{ fontSize: 13, color: Colors.textSecondary }}>This usually takes 5–10 seconds.</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: Colors.textPrimary, marginBottom: 6 }}>Reading your syllabus…</div>
+      <div style={{ fontSize: 13, color: Colors.textHint }}>This usually takes 5–10 seconds.</div>
+      </div>
     </div>
   );
 
   if (status === 'error') return (
-    <div style={{ padding: '0 18px 18px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <SubHeader title="Something went wrong" onBack={onCancel} />
+      <div style={{ padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ background: Colors.redLight, borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: Colors.red, marginBottom: 4 }}>Could not parse syllabus</div>
         <div style={{ fontSize: 13, color: Colors.redDark, lineHeight: 1.5 }}>{error}</div>
       </div>
-      <button onClick={() => setStatus('idle')} style={{ width: '100%', padding: 13, borderRadius: 12, background: Colors.purple, color: '#fff', border: 'none', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 }}>Try again</button>
-      <button onClick={onCancel} style={{ width: '100%', padding: 12, borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer', fontSize: 14, color: Colors.textSecondary, fontFamily: 'inherit' }}>← Back</button>
+      <button onClick={() => setStatus('idle')} style={{ width: '100%', padding: 13, borderRadius: 14, background: Colors.forest, color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 }}>Try again</button>
+      </div>
     </div>
   );
 
@@ -172,7 +200,9 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
   const allSelected   = items.every(i => i.selected);
 
   return (
-    <div style={{ padding: '0 18px 18px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <SubHeader title="Review assignments" subtitle={`Found ${items.length} — uncheck to skip`} onBack={onCancel} />
+      <div style={{ padding: '16px 18px 18px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: Colors.surface, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', marginBottom: 14 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: targetClass.color, flexShrink: 0 }} />
         <div style={{ fontSize: 13, color: Colors.textSecondary }}>Importing into <strong style={{ color: Colors.textPrimary }}>{targetClass.name}</strong></div>
@@ -182,29 +212,29 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
           <div style={{ fontSize: 15, fontWeight: 600, color: Colors.textPrimary }}>Found {items.length} assignment{items.length !== 1 ? 's' : ''}</div>
           <div style={{ fontSize: 12, color: Colors.textSecondary, marginTop: 2 }}>Tap pencil to edit · uncheck to skip</div>
         </div>
-        <button onClick={() => setItems(prev => prev.map(i => ({ ...i, selected: !allSelected })))} style={{ fontSize: 13, color: Colors.purple, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>
+        <button onClick={() => setItems(prev => prev.map(i => ({ ...i, selected: !allSelected })))} style={{ fontSize: 13, color: Colors.forest, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
           {allSelected ? 'Deselect all' : 'Select all'}
         </button>
       </div>
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', overflow: 'hidden', marginBottom: 14 }}>
+      <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #E3EBEA', overflow: 'hidden', marginBottom: 14 }}>
         {items.map((item, i) => {
           if (editingIdx === i) return (
-            <div key={i} style={{ padding: '14px 16px', borderBottom: i < items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', background: Colors.purpleLight }}>
+            <div key={i} style={{ padding: '14px 16px', borderBottom: i < items.length - 1 ? '0.5px solid rgba(0,0,0,0.06)' : 'none', background: '#E8F4F5' }}>
               <div style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: 11, fontWeight: 500, color: Colors.purple, display: 'block', marginBottom: 4 }}>Name</label>
-                <input autoFocus value={item.name} onChange={e => updateItem(i, { name: e.target.value })} style={{ width: '100%', fontSize: 14, padding: '8px 10px', borderRadius: 8, border: `1px solid ${Colors.purple}`, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                <label style={{ fontSize: 11, fontWeight: 500, color: Colors.forest, display: 'block', marginBottom: 4 }}>Name</label>
+                <input autoFocus value={item.name} onChange={e => updateItem(i, { name: e.target.value })} style={{ width: '100%', fontSize: 14, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${Colors.forest}`, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </div>
               <div style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: 11, fontWeight: 500, color: Colors.purple, display: 'block', marginBottom: 4 }}>Due date</label>
-                <input type="date" value={item.dueDate} onChange={e => updateItem(i, { dueDate: e.target.value })} style={{ width: '100%', fontSize: 14, padding: '8px 10px', borderRadius: 8, border: `1px solid ${Colors.purple}`, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                <label style={{ fontSize: 11, fontWeight: 500, color: Colors.forest, display: 'block', marginBottom: 4 }}>Due date</label>
+                <input type="date" value={item.dueDate} onChange={e => updateItem(i, { dueDate: e.target.value })} style={{ width: '100%', fontSize: 14, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${Colors.forest}`, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </div>
               <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 11, fontWeight: 500, color: Colors.purple, display: 'block', marginBottom: 4 }}>Type</label>
-                <select value={item.type} onChange={e => updateItem(i, { type: e.target.value as AssignmentType })} style={{ width: '100%', fontSize: 14, padding: '8px 10px', borderRadius: 8, border: `1px solid ${Colors.purple}`, outline: 'none', fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }}>
+                <label style={{ fontSize: 11, fontWeight: 500, color: Colors.forest, display: 'block', marginBottom: 4 }}>Type</label>
+                <select value={item.type} onChange={e => updateItem(i, { type: e.target.value as AssignmentType })} style={{ width: '100%', fontSize: 14, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${Colors.forest}`, outline: 'none', fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }}>
                   {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
                 </select>
               </div>
-              <button onClick={() => setEditingIdx(null)} style={{ width: '100%', padding: '8px', borderRadius: 8, background: Colors.purple, color: '#fff', border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Done editing</button>
+              <button onClick={() => setEditingIdx(null)} style={{ width: '100%', padding: '8px', borderRadius: 8, background: Colors.forest, color: '#fff', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Done editing</button>
             </div>
           );
           return (
@@ -228,10 +258,10 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
           );
         })}
       </div>
-      <button onClick={() => onDone(items.filter(i => i.selected))} disabled={selectedCount === 0} style={{ width: '100%', padding: 14, borderRadius: 12, background: selectedCount > 0 ? Colors.purple : Colors.grayLight, color: selectedCount > 0 ? '#fff' : Colors.textHint, border: 'none', fontSize: 14, fontWeight: 600, cursor: selectedCount > 0 ? 'pointer' : 'default', fontFamily: 'inherit', marginBottom: 10 }}>
+      <button onClick={() => onDone(items.filter(i => i.selected))} disabled={selectedCount === 0} style={{ width: '100%', padding: 14, borderRadius: 12, background: selectedCount > 0 ? Colors.forest : Colors.grayLight, color: selectedCount > 0 ? '#fff' : Colors.textHint, border: 'none', fontSize: 14, fontWeight: 700, cursor: selectedCount > 0 ? 'pointer' : 'default', fontFamily: 'inherit', marginBottom: 10 }}>
         Save {selectedCount} assignment{selectedCount !== 1 ? 's' : ''}
       </button>
-      <button onClick={onCancel} style={{ width: '100%', padding: 12, borderRadius: 12, border: '0.5px solid rgba(0,0,0,0.1)', background: '#fff', cursor: 'pointer', fontSize: 14, color: Colors.textSecondary, fontFamily: 'inherit' }}>Cancel</button>
+      </div>
     </div>
   );
 }

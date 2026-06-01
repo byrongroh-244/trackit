@@ -151,7 +151,7 @@ export default function FocusTimer({ assignmentName, activeStepText, workMinutes
       alignItems: 'center', justifyContent: 'space-between',
       padding: '52px 28px 44px',
       transition: 'background 0.6s',
-      maxWidth: 430, margin: '0 auto',
+
     }}>
 
       {/* Top bar */}

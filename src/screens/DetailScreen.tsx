@@ -125,16 +125,24 @@ export default function DetailScreen() {
   function toggleSubtask(id: string) {
     const isChecking = !subtasks.find(s => s.id === id)?.done;
     const updated = subtasks.map(s => s.id === id ? { ...s, done: !s.done } : s);
-    update({ subtasks: updated });
 
     if (isChecking) {
-      // Bump the animation key so check-pop replays for this subtask
-      setSubtaskAnimKey(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
-      // Check if this was the last incomplete step
-      const allDone = updated.every(s => s.done);
-      setAllStepsDone(allDone);
+      // Trigger slide-out animation (-1 = completing), then commit after animation
+      setSubtaskAnimKey(prev => ({ ...prev, [id]: -1 }));
+      setTimeout(() => {
+        update({ subtasks: updated });
+        // Mark next step as new-first after a moment
+        const nextStep = updated.find(s => !s.done);
+        if (nextStep) {
+          setSubtaskAnimKey(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1, [nextStep.id]: (prev[nextStep.id] ?? 0) + 1 }));
+        } else {
+          setSubtaskAnimKey(prev => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+        }
+        const allDone = updated.every(s => s.done);
+        setAllStepsDone(allDone);
+      }, 380);
     } else {
-      // Un-checking: clear the celebration banner
+      update({ subtasks: updated });
       setAllStepsDone(false);
     }
   }
@@ -199,6 +207,25 @@ export default function DetailScreen() {
 
   return (
     <>
+      <style>{`
+        @keyframes step-slide-out {
+          0%   { opacity: 1; transform: translateY(0) scale(1); max-height: 80px; }
+          40%  { opacity: 0; transform: translateY(-14px) scale(0.97); }
+          100% { opacity: 0; transform: translateY(-14px) scale(0.97); max-height: 0; padding: 0; margin: 0; }
+        }
+        @keyframes step-slide-in {
+          0%   { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .step-completing {
+          animation: step-slide-out 0.42s cubic-bezier(0.4,0,0.2,1) forwards;
+          overflow: hidden;
+        }
+        .step-new-first {
+          animation: step-slide-in 0.32s cubic-bezier(0.34,1.56,0.64,1) both;
+          animation-delay: 0.18s;
+        }
+      `}</style>
       {focusing && (
         <FocusTimer
           assignmentName={a.name}
@@ -540,8 +567,13 @@ export default function DetailScreen() {
                   // Label first step "Start here"
                   const isFirst = idx === 0 && !s.done;
 
+                  const isNewFirst = idx === 0 && !s.done && subtasks.filter(x => !x.done).indexOf(s) === 0 && subtaskAnimKey[subtasks[idx > 0 ? idx - 1 : 0]?.id ?? ''] > 0;
                   return (
-                    <div key={s.id}>
+                    <div
+                      key={s.id}
+                      className={subtaskAnimKey[s.id] === -1 ? 'step-completing' : isNewFirst ? 'step-new-first' : undefined}
+                      style={{ overflow: 'hidden' }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 0' }}>
                         <CheckCircle checked={s.done} onToggle={() => toggleSubtask(s.id)} size={22} animationKey={subtaskAnimKey[s.id]} />
                         <div style={{ flex: 1 }}>
@@ -613,15 +645,21 @@ export default function DetailScreen() {
             <div style={{ padding: '8px 18px calc(12px + env(safe-area-inset-bottom))', background: Colors.surface, borderTop: `0.5px solid rgba(0,0,0,0.08)`, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>            {!a.done && (
               <button
                 onClick={() => {
-                  // Record which subtask is "in focus" for the post-focus panel
                   const nextStep = subtasks.find(s => !s.done) ?? null;
                   focusedSubtaskIdRef.current = nextStep?.id ?? null;
                   setFocusing(true);
                 }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, border: 'none', background: Colors.forest, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '16px', borderRadius: 16, border: 'none', background: Colors.forest, cursor: 'pointer', fontFamily: 'inherit', position: 'relative', overflow: 'hidden' }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Start focusing
+                {/* Lime play squircle */}
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: '#B8E04A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill={Colors.forest} stroke="none">
+                    <polygon points="5,3 21,12 5,21"/>
+                  </svg>
+                </div>
+                <span style={{ fontSize: 17, fontWeight: 800, color: '#B8E04A', letterSpacing: '-0.02em' }}>
+                  Start focusing
+                </span>
               </button>
             )}
             {/* Mark as done — green */}

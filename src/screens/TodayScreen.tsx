@@ -193,6 +193,7 @@ export default function TodayScreen() {
         padding: '22px 20px 0',
         flexShrink: 0,
       }}>
+        {/* Title row */}
         <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 18 }}>
           <div>
             <div style={{ fontSize: 27, fontWeight: 800, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>
@@ -202,27 +203,17 @@ export default function TodayScreen() {
               {dateStr} &middot; {active.length} assignment{active.length !== 1 ? 's' : ''}
             </div>
           </div>
-
         </div>
-      </div>
 
-      <ScrollBody hasNav>
-
-        {/* ── Week-at-a-glance strip ── */}
+        {/* Week strip — inside header, full width, no scroll */}
         {showWeekStrip && (
           <div style={{
             display: 'flex',
-            overflowX: 'auto',
             gap: 4,
-            padding: '10px 12px 8px',
-            borderBottom: '0.5px solid rgba(0,0,0,0.07)',
-            // Hide scrollbar cross-browser
-            msOverflowStyle: 'none',
-            scrollbarWidth: 'none' as any,
+            paddingBottom: 16,
           }}>
             {weekDays.map(day => {
               const hasDue = day.items.length > 0;
-              // Cap visible dots at 3, show +N for overflow
               const visibleDots = day.items.slice(0, 3);
               const overflow    = day.items.length - 3;
 
@@ -231,81 +222,67 @@ export default function TodayScreen() {
                   key={day.dateKey}
                   onClick={() => handleDayPress(day.dateKey)}
                   style={{
-                    flexShrink: 0,
-                    width: 52,
-                    minHeight: 68,
-                    borderRadius: 12,
+                    flex: 1,
+                    minHeight: 64,
+                    borderRadius: 10,
                     border: day.isToday
-                      ? `2px solid ${Colors.forest}`
-                      : '0.5px solid rgba(0,0,0,0.08)',
-                    background: day.isToday ? Colors.purpleLight : 'transparent',
+                      ? '2px solid rgba(184,224,74,0.8)'
+                      : '1px solid rgba(255,255,255,0.1)',
+                    background: day.isToday ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '7px 4px 6px',
-                    gap: 4,
+                    padding: '7px 2px 6px',
+                    gap: 3,
                   }}
                 >
-                  {/* Day label */}
                   <span style={{
-                    fontSize: 10,
-                    fontWeight: 500,
-                    color: day.isToday ? Colors.forest : Colors.textSecondary,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: day.isToday ? '#B8E04A' : 'rgba(255,255,255,0.45)',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
+                    letterSpacing: '0.05em',
                   }}>
                     {day.dayLabel}
                   </span>
 
-                  {/* Date number */}
                   <span style={{
-                    fontSize: 18,
-                    fontWeight: day.isToday ? 700 : 400,
-                    color: day.isToday ? Colors.forest : Colors.textPrimary,
+                    fontSize: 17,
+                    fontWeight: day.isToday ? 800 : 400,
+                    color: day.isToday ? '#fff' : 'rgba(255,255,255,0.7)',
                     lineHeight: 1,
+                    letterSpacing: day.isToday ? '-0.02em' : 0,
                   }}>
                     {day.dateNum}
                   </span>
 
-                  {/* Assignment dots */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 2,
-                    minHeight: 8,
+                    minHeight: 7,
                   }}>
                     {hasDue ? (
                       <>
                         {visibleDots.map(a => (
-                          <span
-                            key={a.id}
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: '50%',
-                              background: a.classColor || Colors.purple,
-                              flexShrink: 0,
-                            }}
-                          />
+                          <span key={a.id} style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: day.isToday ? '#B8E04A' : 'rgba(255,255,255,0.5)',
+                            flexShrink: 0,
+                          }} />
                         ))}
                         {overflow > 0 && (
-                          <span style={{
-                            fontSize: 9,
-                            color: Colors.textHint,
-                            lineHeight: 1,
-                            marginLeft: 1,
-                          }}>
+                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', lineHeight: 1, marginLeft: 1 }}>
                             +{overflow}
                           </span>
                         )}
                       </>
                     ) : (
-                      // Empty placeholder keeps height consistent
-                      <span style={{ width: 6, height: 6 }} />
+                      <span style={{ width: 5, height: 5 }} />
                     )}
                   </div>
                 </button>
@@ -314,49 +291,65 @@ export default function TodayScreen() {
           </div>
         )}
 
-        {/* ── Start Now hero button ── */}
+        {/* Start Next Task — fully rounded card inside header */}
         {startTarget && (
-          <div style={{ padding: '10px 12px 4px' }}>
-            <button
-              onClick={handleStartNow}
-              style={{
-                width: '100%',
-                minHeight: 56,
-                borderRadius: 14,
-                border: 'none',
-                background: Colors.forest,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                padding: '12px 18px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 3,
-                transition: 'opacity 0.15s',
-              }}
-              onMouseOver={e => (e.currentTarget.style.opacity = '0.88')}
-              onMouseOut={e => (e.currentTarget.style.opacity = '1')}
-            >
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: '0.01em', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <IconPlay size={15} color="#fff" />
+          <button
+            onClick={handleStartNow}
+            style={{
+              width: '100%',
+              minHeight: 58,
+              borderRadius: 16,
+              border: 'none',
+              background: 'rgba(255,255,255,0.10)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              transition: 'background 0.15s',
+              marginTop: showWeekStrip ? 4 : 8,
+              marginBottom: 16,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.16)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.10)')}
+          >
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: '#B8E04A',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill={Colors.forest} stroke="none">
+                <polygon points="5,3 21,12 5,21" />
+              </svg>
+            </div>
+            <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#B8E04A', letterSpacing: '-0.01em' }}>
                 Start next task
-              </span>
+              </div>
               {startSubtitle && (
-                <span style={{
-                  fontSize: 12,
-                  color: 'rgba(255,255,255,0.7)',
-                  maxWidth: '100%',
+                <div style={{
+                  fontSize: 11,
+                  color: 'rgba(255,255,255,0.5)',
+                  marginTop: 2,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}>
                   {startSubtitle}
-                </span>
+                </div>
               )}
-            </button>
-          </div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9,18 15,12 9,6"/>
+            </svg>
+          </button>
         )}
+      </div>
+
+      <ScrollBody hasNav>
+        <div style={{ paddingTop: 0 }}>
 
         {/* ── Main list ── */}
         {assignments.length === 0 ? (
@@ -377,7 +370,7 @@ export default function TodayScreen() {
                       background: Colors.grayLight,
                       borderTop: '0.5px solid rgba(0,0,0,0.08)',
                       borderBottom: '0.5px solid rgba(0,0,0,0.08)',
-                      marginTop: 18,
+                      marginTop: 24,
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -406,7 +399,7 @@ export default function TodayScreen() {
                   </button>
 
                   {!collapsed[key] && (
-                    <div style={{ paddingBottom: 6 }}>
+                    <div style={{ paddingBottom: 6, paddingTop: 10 }}>
                       {items.map(a => (
                         <AssignmentCard
                           key={a.id}
@@ -490,6 +483,7 @@ export default function TodayScreen() {
             )}
           </>
         )}
+        </div>
       </ScrollBody>
 
       <BottomNav current="today" onNavigate={s => navigate(s as any)} items={NAV} />
