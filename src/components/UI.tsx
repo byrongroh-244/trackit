@@ -488,7 +488,6 @@ export function BottomNav({ current, onNavigate, items }: {
       borderTop: '0.5px solid #E3EBEA',
       paddingBottom: 'env(safe-area-inset-bottom)',
       zIndex: 100,
-      maxWidth: 430, margin: '0 auto',
     }}>
       {/* Left items */}
       {left.map(item => <NavBtn key={item.screen} item={item} />)}

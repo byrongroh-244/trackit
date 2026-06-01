@@ -405,16 +405,20 @@ export default function TodayScreen() {
                     </span>
                   </button>
 
-                  {!collapsed[key] && items.map(a => (
-                    <AssignmentCard
-                      key={a.id}
-                      assignment={a}
-                      onPress={() => navigate('detail', a.id)}
-                      onToggleDone={() => toggleDone(a.id)}
-                      completing={completingId === a.id}
-                      onAnimationEnd={() => handleCardAnimationEnd(a.id)}
-                    />
-                  ))}
+                  {!collapsed[key] && (
+                    <div style={{ paddingBottom: 6 }}>
+                      {items.map(a => (
+                        <AssignmentCard
+                          key={a.id}
+                          assignment={a}
+                          onPress={() => navigate('detail', a.id)}
+                          onToggleDone={() => toggleDone(a.id)}
+                          completing={completingId === a.id}
+                          onAnimationEnd={() => handleCardAnimationEnd(a.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : null
             )}

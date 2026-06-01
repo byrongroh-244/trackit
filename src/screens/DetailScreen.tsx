@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
 import { daysUntil, formatShortDate, uid, inferType, rescheduleSubtasks, generateSubtasks } from '../data/store';
 import { Colors, getUrgencyConfig } from '../theme';
-import { Screen, ScrollBody, CheckCircle, ProgressBar, SaveButton, ConfirmSheet, useToast } from '../components/UI';
+import { Screen, ScrollBody, CheckCircle, SaveButton, ConfirmSheet, useToast } from '../components/UI';
 import { IconTrash, IconZap, IconClock, IconBattery, IconParty, IconCircleCheck, IconRefreshCw, IconArrowLeft } from '../components/Icons';
 import FocusTimer from '../components/FocusTimer';
 import DeadlineRecovery from '../components/DeadlineRecovery';
@@ -194,8 +194,6 @@ export default function DetailScreen() {
     ? 'Due tomorrow'
     : `${days} days`;
 
-  const daysColor = days < 0 ? Colors.red : days <= 3 ? Colors.amber : Colors.tealDark;
-  const daysBg    = days < 0 ? Colors.redLight : days <= 3 ? '#FAEEDA' : Colors.tealLight;
 
   const inputStyle = { ...Styles.inputBase } as React.CSSProperties;
 
@@ -227,9 +225,10 @@ export default function DetailScreen() {
       )}
 
       <Screen>
-        {/* Dark forest header — class color accent bar at bottom */}
-        <div style={{ background: Colors.forest, padding: '18px 20px 0', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        {/* Unified dark forest header — nav + title + pills + progress */}
+        <div style={{ background: Colors.forest, padding: '18px 20px 16px', flexShrink: 0 }}>
+          {/* Nav row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <button
               onClick={() => navigate('today')}
               style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
@@ -247,8 +246,53 @@ export default function DetailScreen() {
               </button>
             </div>
           </div>
-          {/* Class color accent bar */}
-          <div style={{ height: 3, background: a.classColor || Colors.teal, borderRadius: '2px 2px 0 0' }} />
+
+          {/* Assignment title */}
+          {!editing && (
+            <>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', lineHeight: 1.2, marginBottom: 12, letterSpacing: '-0.03em' }}>
+                {a.name}
+              </div>
+
+              {/* Pills — white frosted */}
+              <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap', marginBottom: total > 0 ? 14 : 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 11px', borderRadius: 20, background: 'rgba(255,255,255,0.18)', color: '#fff' }}>
+                  {daysLabel}
+                </span>
+                {a.className && (
+                  <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, background: 'rgba(255,255,255,0.18)', color: '#fff' }}>
+                    {a.className}
+                  </span>
+                )}
+                {a.type && a.type !== 'homework' && (
+                  <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, background: 'rgba(255,255,255,0.18)', color: '#fff' }}>
+                    {a.type.charAt(0).toUpperCase() + a.type.slice(1)}
+                  </span>
+                )}
+                {a.effort && (
+                  <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 11px', borderRadius: 20, background: 'rgba(255,255,255,0.18)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {a.effort === 'quick'  ? <IconZap size={12} color="#fff" />    :
+                     a.effort === 'medium' ? <IconClock size={12} color="#fff" />  :
+                                             <IconBattery size={12} color="#fff" />}
+                    {a.effort === 'quick' ? 'Quick' : a.effort === 'medium' ? 'Medium' : 'Long'}
+                  </span>
+                )}
+              </div>
+
+              {/* Progress bar inside header */}
+              {total > 0 && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Progress</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>{completed} of {total} steps</span>
+                  </div>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, background: '#B8E04A', borderRadius: 2, transition: 'width 0.3s ease' }} />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <ScrollBody>
@@ -319,47 +363,7 @@ export default function DetailScreen() {
             </div>
           ) : (
             <>
-              {/* ── Title header ── */}
-              <div style={{ padding: '14px 18px 12px', borderBottom: `0.5px solid rgba(0,0,0,0.08)`, background: Colors.surface }}>
-                <div style={{ fontSize: 20, fontWeight: 600, color: Colors.textPrimary, lineHeight: 1.25, marginBottom: 10 }}>
-                  {a.name}
-                </div>
-                {/* Pills row */}
-                <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, background: daysBg, color: daysColor }}>
-                    {daysLabel}
-                  </span>
-                  {a.className && (
-                    <span style={{ fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, background: `${a.classColor}22`, color: a.classColor }}>
-                      {a.className}
-                    </span>
-                  )}
-                  {a.type && a.type !== 'homework' && (
-                    <span style={{ fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, background: Colors.grayLight, color: Colors.textSecondary }}>
-                      {a.type.charAt(0).toUpperCase() + a.type.slice(1)}
-                    </span>
-                  )}
-                  {a.effort && (
-                    <span style={{ fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, background: Colors.grayLight, color: Colors.textSecondary, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {a.effort === 'quick'  ? <IconZap size={12} />    :
-                       a.effort === 'medium' ? <IconClock size={12} />  :
-                                               <IconBattery size={12} />}
-                      {a.effort === 'quick' ? 'Quick' : a.effort === 'medium' ? 'Medium' : 'Long'}
-                    </span>
-                  )}
-                </div>
-              </div>
 
-              {/* ── Progress ── */}
-              {total > 0 && (
-                <div style={{ padding: '12px 18px 10px', borderBottom: `0.5px solid rgba(0,0,0,0.08)`, background: Colors.surface }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 10, fontWeight: 500, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Progress</span>
-                    <span style={{ fontSize: 11, color: Colors.textSecondary }}>{completed} of {total} steps</span>
-                  </div>
-                  <ProgressBar value={progress} />
-                </div>
-              )}
 
               {/* ── Deadline recovery ── */}
               {isPastDue && (
