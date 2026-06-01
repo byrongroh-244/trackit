@@ -47,6 +47,7 @@ export interface AppSettings {
   gradeLevel: string;
   currentSemester: string;
   onboardingComplete: boolean;
+  microstepsEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -56,6 +57,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   gradeLevel: '',
   currentSemester: 'fall',
   onboardingComplete: false,
+  microstepsEnabled: true,
 };
 
 export function loadSettings(): AppSettings {

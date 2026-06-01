@@ -21,7 +21,8 @@ const EditIcon = () => (
 export default function DetailScreen() {
   const { assignments, courses, detailId, navigate, patchAssignment, deleteAssignment, settings } = useApp();
   const { showToast } = useToast();
-  const assignment = assignments.find(a => a.id === detailId);
+  const microsteps  = settings.microstepsEnabled !== false;
+  const assignment  = assignments.find(a => a.id === detailId);
 
   const [editingDateId,       setEditingDateId]       = useState<string | null>(null);
   const [newStepText,         setNewStepText]         = useState('');
@@ -52,7 +53,7 @@ export default function DetailScreen() {
   // If the assignment loaded with no subtasks (e.g. imported before AI fallback
   // was available), generate them now and patch silently.
   useEffect(() => {
-    if (!assignment || assignment.subtasks.length > 0 || generatingSteps || assignment.type === 'task') return;
+    if (!assignment || assignment.subtasks.length > 0 || generatingSteps || assignment.type === 'task' || !microsteps) return;
     setGeneratingSteps(true);
     generateSubtasks(assignment.name, assignment.dueDate, '', assignment.effort ?? null)
       .then(subtasks => {

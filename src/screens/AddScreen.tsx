@@ -115,6 +115,7 @@ function TypeSelectOverlay({ onPick, onDismiss }: {
 
 export default function AddScreen() {
   const { courses, assignments, settings, updateAssignments, upsertAssignments, updateCourses, navigate } = useApp();
+  const microsteps = settings.microstepsEnabled !== false; // default true
   const { showToast } = useToast();
 
   type Mode = 'typeSelect' | 'inputMethod' | 'manual' | 'voice' | 'pickClass' | 'syllabus';
@@ -150,7 +151,7 @@ export default function AddScreen() {
       classId: targetClass.id, className: targetClass.name, classColor: targetClass.color,
       dueDate: item.dueDate, done: false, notes: '',
       type: item.type, effort: null,
-      subtasks: item.type === 'task' ? [] : await generateSubtasks(item.name, item.dueDate, gradeLevel),
+      subtasks: (item.type === 'task' || !microsteps) ? [] : await generateSubtasks(item.name, item.dueDate, gradeLevel),
     })));
     upsertAssignments(newAssignments);
     showToast(`${newAssignments.length} item${newAssignments.length !== 1 ? 's' : ''} added!`, 'success');
@@ -165,7 +166,7 @@ export default function AddScreen() {
       classId: cls.id, className: cls.name, classColor: cls.color,
       dueDate: item.dueDate, done: false, notes: '',
       type: item.type, effort: null,
-      subtasks: item.type === 'task' ? [] : await generateSubtasks(item.name, item.dueDate, gradeLevel),
+      subtasks: (item.type === 'task' || !microsteps) ? [] : await generateSubtasks(item.name, item.dueDate, gradeLevel),
     };
     await upsertAssignments([newA]);
     navigate(item.type === 'task' ? 'today' : 'detail', newA.id);
@@ -186,7 +187,7 @@ export default function AddScreen() {
       dueDate: date, done: false, notes,
       type: selType || inferType(name),
       effort: isTask ? null : effort,
-      subtasks: isTask ? [] : await generateSubtasks(name, date, gradeLevel, effort),
+      subtasks: (isTask || !microsteps) ? [] : await generateSubtasks(name, date, gradeLevel, effort),
     };
     await updateAssignments([...assignments, newA], [newA]);
     setEffort(null);

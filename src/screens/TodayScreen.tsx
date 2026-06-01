@@ -137,7 +137,10 @@ export default function TodayScreen() {
     const a = assignments.find(x => x.id === id);
     if (!a) return;
     if (!a.done) {
+      // Mark done immediately — animation is cosmetic
+      patchAssignment({ ...a, done: true });
       setCompletingId(id);
+      setTimeout(() => setCompletingId(null), 420);
     } else {
       patchAssignment({ ...a, done: false });
     }
@@ -145,8 +148,6 @@ export default function TodayScreen() {
 
   function handleCardAnimationEnd(id: string) {
     setCompletingId(null);
-    const a = assignments.find(x => x.id === id);
-    if (a) patchAssignment({ ...a, done: true });
   }
 
   function goToLookaheadSettings() {

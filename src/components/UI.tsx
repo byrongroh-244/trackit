@@ -282,8 +282,7 @@ export function CheckCircle({
 }) {
   return (
     <button
-      onClick={e => { e.stopPropagation(); onToggle(); }}
-      onTouchEnd={e => { e.stopPropagation(); }}
+      onClick={e => { e.stopPropagation(); e.preventDefault(); onToggle(); }}
       style={{
         width: 44, height: 44,
         background: 'none', border: 'none', padding: 0,
@@ -296,8 +295,8 @@ export function CheckCircle({
         className={checked && animationKey !== undefined ? 'check-pop' : undefined}
         style={{
           width: size, height: size, borderRadius: '50%',
-          border: `1.5px solid ${checked ? Colors.teal : 'rgba(0,0,0,0.2)'}`,
-          background: checked ? Colors.teal : 'transparent',
+          border: `1.5px solid ${checked ? '#B8E04A' : 'rgba(0,0,0,0.2)'}`,
+          background: checked ? '#B8E04A' : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, color: '#fff',
           transition: checked ? 'border-color 0.1s, background 0.1s' : 'all 0.15s',
@@ -307,7 +306,7 @@ export function CheckCircle({
         {checked ? (
           <svg viewBox="0 0 24 24" width={size * 0.6} height={size * 0.6} fill="none"
             stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
+            <polyline points="20 6 9 17 4 12" fill="none" stroke={Colors.forest} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         ) : null}
       </span>

@@ -150,7 +150,7 @@ function SettingsSectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function SettingsScreen() {
-  const { navigate, reset, settings, updateSettings, signOut } = useApp();
+  const { navigate, reset, settings, updateSettings, signOut, userEmail } = useApp();
   const [highlight,     setHighlight]     = useState(false);
   const [showChangePw,  setShowChangePw]  = useState(false);
   const [newPassword,   setNewPassword]   = useState('');
@@ -298,6 +298,37 @@ export default function SettingsScreen() {
             </div>
           </Card>
 
+          {/* ── AI features ── */}
+          <SettingsSectionLabel>AI features</SettingsSectionLabel>
+          <Card>
+            <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary }}>AI micro-steps</div>
+                <div style={{ fontSize: 12, color: Colors.textHint, marginTop: 2, lineHeight: 1.5 }}>
+                  Automatically break assignments into small steps
+                </div>
+              </div>
+              <button
+                onClick={() => updateSettings({ ...settings, microstepsEnabled: !(settings.microstepsEnabled !== false) })}
+                style={{
+                  width: 48, height: 28, borderRadius: 14,
+                  background: settings.microstepsEnabled !== false ? Colors.forest : Colors.grayLight,
+                  border: 'none', cursor: 'pointer', position: 'relative',
+                  transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  position: 'absolute', top: 3,
+                  left: settings.microstepsEnabled !== false ? 22 : 3,
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: '#fff',
+                  transition: 'left 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </button>
+            </div>
+          </Card>
+
           {/* ── Focus timer ── */}
           <SettingsSectionLabel>Focus timer</SettingsSectionLabel>
           <Card>
@@ -359,6 +390,21 @@ export default function SettingsScreen() {
           {/* ── Account ── */}
           <SettingsSectionLabel>Account</SettingsSectionLabel>
           <Card>
+            {/* Logged-in email */}
+            {userEmail && (
+              <div style={{ padding: '13px 16px', borderBottom: '0.5px solid #E3EBEA', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: '#E8F4F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={Colors.forest} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Signed in as</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userEmail}</div>
+                </div>
+              </div>
+            )}
             <IconRow
               icon={<KeyIcon />}
               label="Change password"
@@ -404,14 +450,6 @@ export default function SettingsScreen() {
               iconColor={Colors.textSecondary}
               labelColor={Colors.textSecondary}
               onClick={() => signOut()}
-            />
-            <IconRow
-              icon={<SemesterIcon />}
-              label="Start new semester"
-              sub={`Current: ${semesterLabel} · ${settings.gradeLevel ? settings.gradeLevel.replace('hs_', 'Grade ').replace('col_', 'Year ') : 'Grade not set'}`}
-              iconBg='#E8F4F5'
-              iconColor={Colors.forest}
-              onClick={() => navigate('onboarding' as any)}
               borderBottom={false}
             />
           </Card>
@@ -419,6 +457,15 @@ export default function SettingsScreen() {
           {/* ── Danger zone — visually separated red card ── */}
           <SettingsSectionLabel>Danger zone</SettingsSectionLabel>
           <Card>
+            <IconRow
+              icon={<SemesterIcon />}
+              label="Start new semester"
+              sub={`Current: ${semesterLabel} · ${settings.gradeLevel ? settings.gradeLevel.replace('hs_', 'Grade ').replace('col_', 'Year ') : 'Grade not set'}`}
+              iconBg={Colors.redLight}
+              iconColor={Colors.red}
+              labelColor={Colors.red}
+              onClick={() => navigate('onboarding' as any)}
+            />
             <IconRow
               icon={<TrashIcon color={Colors.red} />}
               label="Reset all data"

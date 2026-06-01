@@ -11,6 +11,7 @@ interface AppState {
   settings: AppSettings;
   loading: boolean;
   userId: string | null;
+  userEmail: string | null;
 }
 
 interface AppCtx extends AppState {
@@ -74,6 +75,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [detailId,    setDetailId]    = useState<string | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [userId,      setUserId]      = useState<string | null>(null);
+  const [userEmail,   setUserEmail]   = useState<string | null>(null);
 
   // useRef so callbacks always read the latest userId without needing it
   // in their dependency arrays. A plain object literal re-created each render
@@ -98,6 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         gradeLevel:           sData.grade_level             ?? '',
         currentSemester:      sData.current_semester        ?? 'fall',
         onboardingComplete:   sData.onboarding_complete     ?? false,
+        microstepsEnabled:    sData.microsteps_enabled       ?? true,
       };
       setSettings(s);
       saveSettings(s);
@@ -112,12 +115,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { setUserId(session.user.id); loadData(session.user.id); }
+      if (session?.user) { setUserId(session.user.id); setUserEmail(session.user.email ?? null); loadData(session.user.id); }
       else setLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) { setUserId(session.user.id); loadData(session.user.id); }
-      else { setUserId(null); setAssignments([]); setCourses([]); setLoading(false); }
+      if (session?.user) { setUserId(session.user.id); setUserEmail(session.user.email ?? null); loadData(session.user.id); }
+      else { setUserId(null); setUserEmail(null); setAssignments([]); setCourses([]); setLoading(false); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -232,6 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       grade_level:           s.gradeLevel,
       current_semester:      s.currentSemester,
       onboarding_complete:   s.onboardingComplete,
+      microsteps_enabled:    s.microstepsEnabled ?? true,
     }, { onConflict: 'user_id' });
 
     if (error) console.error('updateSettings error:', error);
@@ -264,7 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{
-      assignments, courses, screen, detailId, settings, loading, userId,
+      assignments, courses, screen, detailId, settings, loading, userId, userEmail,
       navigate, updateAssignments, upsertAssignments, updateCourses,
       patchAssignment, deleteAssignment, updateSettings, reset, signOut,
     }}>
