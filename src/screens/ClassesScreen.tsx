@@ -85,9 +85,9 @@ export default function ClassesScreen() {
     const updated = courses.map(c => c.id === editingId ? { ...c, name: editName.trim(), color: editColor } : c);
     updateCourses(updated);
     const updatedAssignments = assignments.map(a =>
-      a.classId === editingId ? { ...a, className: editName.trim(), classColor: editColor } : a
+      (a.classId === editingId || (!a.classId && a.className === (courses.find(x => x.id === editingId)?.name ?? ''))) ? { ...a, className: editName.trim(), classColor: editColor } : a
     );
-    updateAssignments(updatedAssignments, updatedAssignments.filter(a => a.classId === editingId));
+    updateAssignments(updatedAssignments, updatedAssignments.filter(a => a.classId === editingId || (!a.classId && a.className === editName.trim())));
     setEditingId(null);
   }
   function cancelEdit() { setEditingId(null); }
@@ -112,7 +112,7 @@ export default function ClassesScreen() {
   // ── Class detail view ──────────────────────────────────────────────────────
   if (selectedClass) {
     const liveClass        = courses.find(c => c.id === selectedClass.id) ?? selectedClass;
-    const classAssignments = assignments.filter(a => a.classId === liveClass.id);
+    const classAssignments = assignments.filter(a => a.classId === liveClass.id || (!a.classId && a.className === liveClass.name));
     const active           = classAssignments.filter(a => !a.done);
     const done             = classAssignments.filter(a => a.done);
 
@@ -193,7 +193,7 @@ export default function ClassesScreen() {
   return (
     <>
       {confirmDeleteId && (() => {
-        const count = assignments.filter(a => a.classId === confirmDeleteId && !a.done).length;
+        const count = assignments.filter(a => (a.classId === confirmDeleteId || (!a.classId && a.className === (courses.find(x => x.id === confirmDeleteId)?.name ?? ''))) && !a.done).length;
         const body = count > 0
           ? `This class has ${count} active assignment${count !== 1 ? 's' : ''}. They will not be deleted, but will lose their class label.`
           : undefined;
@@ -287,7 +287,7 @@ export default function ClassesScreen() {
           )}
 
           {courses.map(c => {
-            const activeCount = assignments.filter(a => a.classId === c.id && !a.done).length;
+            const activeCount = assignments.filter(a => (a.classId === c.id || (!a.classId && a.className === c.name)) && !a.done).length;
             const isEditing   = editingId === c.id;
 
             // ── Edit form ──
