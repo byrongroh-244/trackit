@@ -283,6 +283,7 @@ export function CheckCircle({
   return (
     <button
       onClick={e => { e.stopPropagation(); onToggle(); }}
+      onTouchEnd={e => { e.stopPropagation(); }}
       style={{
         width: 44, height: 44,
         background: 'none', border: 'none', padding: 0,

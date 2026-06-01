@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
 import { daysUntil } from '../data/store';
 import { Colors, getUrgencyConfig } from '../theme';
@@ -575,6 +575,28 @@ export default function CalendarScreen() {
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
+  // ── Swipe to navigate ─────────────────────────────────────────────────────
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+    // Only horizontal swipes (dx > 50, dy < 60)
+    if (Math.abs(dx) > 50 && dy < 60) {
+      if (dx < 0) nextPeriod();
+      else prevPeriod();
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }
+
   useEffect(() => {
     try {
       const target = sessionStorage.getItem('trackit_calendar_date');
@@ -691,7 +713,11 @@ export default function CalendarScreen() {
       </div>
 
       <ScrollBody hasNav>
-        <div style={{ paddingTop: 10 }}>
+        <div
+          style={{ paddingTop: 10 }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           {viewMode === 'week' ? (
             <WeekView
               weekStart={monday}

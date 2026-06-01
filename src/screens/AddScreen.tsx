@@ -129,19 +129,21 @@ export default function AddScreen() {
 
   return (
     <Screen>
-      {/* Dark forest header — primary nav destination, sets the tone */}
-      <div style={{ background: Colors.forest, padding: '22px 20px 18px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 27, fontWeight: 800, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>
-              Add assignment
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.38)', marginTop: 4, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-              {subtitle}
+      {/* Header — only shown when sub-components don't provide their own */}
+      {(mode === 'menu' || mode === 'manual' || mode === 'inputMethod') && (
+        <div style={{ background: Colors.forest, padding: '22px 20px 18px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 27, fontWeight: 800, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>
+                Add assignment
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.38)', marginTop: 4, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
+                {subtitle}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <ScrollBody hasNav>
 
@@ -253,34 +255,28 @@ export default function AddScreen() {
 
         {/* ── Voice ── */}
         {mode === 'voice' && (
-          <div style={{ paddingTop: 16 }}>
-            <VoiceInput courses={courses} onDone={handleVoiceImport} onCancel={() => setMode('menu')} />
-          </div>
+          <VoiceInput courses={courses} onDone={handleVoiceImport} onCancel={() => setMode('menu')} />
         )}
 
         {/* ── Pick class ── */}
         {mode === 'pickClass' && (
-          <div style={{ paddingTop: 16 }}>
-            <ClassPicker
-              courses={courses}
-              updateCourses={updateCourses}
-              onPick={(cls: import('../types').Course) => { setTargetClass(cls); setMode('syllabus'); }}
-              onCancel={() => setMode('menu')}
-            />
-          </div>
+          <ClassPicker
+            courses={courses}
+            updateCourses={updateCourses}
+            onPick={(cls: import('../types').Course) => { setTargetClass(cls); setMode('syllabus'); }}
+            onCancel={() => setMode('menu')}
+          />
         )}
 
         {/* ── Syllabus ── */}
         {mode === 'syllabus' && targetClass && (
-          <div style={{ paddingTop: 16 }}>
-            <SyllabusParser targetClass={targetClass} settings={settings} onDone={handleSyllabusImport} onCancel={() => setMode('pickClass')} />
-          </div>
+          <SyllabusParser targetClass={targetClass} settings={settings} onDone={handleSyllabusImport} onCancel={() => setMode('pickClass')} />
         )}
 
         {/* ── Manual form — forest active states ── */}
         {mode === 'manual' && (
           <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <button onClick={() => setMode('menu')} style={{ background: 'none', border: 'none', color: Colors.forest, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', padding: 0, marginBottom: 4 }}>← Back</button>
+
             <Field label="Assignment name *"><TextInput ref={nameRef} placeholder="e.g. Essay draft" /></Field>
             <Field label="Class">
               {courses.length === 0 ? (
