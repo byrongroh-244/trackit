@@ -52,7 +52,7 @@ export default function DetailScreen() {
   // If the assignment loaded with no subtasks (e.g. imported before AI fallback
   // was available), generate them now and patch silently.
   useEffect(() => {
-    if (!assignment || assignment.subtasks.length > 0 || generatingSteps) return;
+    if (!assignment || assignment.subtasks.length > 0 || generatingSteps || assignment.type === 'task') return;
     setGeneratingSteps(true);
     generateSubtasks(assignment.name, assignment.dueDate, '', assignment.effort ?? null)
       .then(subtasks => {

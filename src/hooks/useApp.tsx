@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { Assignment, Course, Screen } from '../types';
 import { supabase } from '../lib/supabase';
-import { loadSettings, saveSettings, type AppSettings } from '../data/store';
+import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../data/store';
 
 interface AppState {
   assignments: Assignment[];
@@ -101,6 +101,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       setSettings(s);
       saveSettings(s);
+    } else {
+      // New user — no settings row yet. Clear any stale localStorage from
+      // a previous user on this device so onboardingComplete starts false.
+      try { localStorage.removeItem('trackit_settings'); } catch {}
+      setSettings({ ...DEFAULT_SETTINGS });
     }
     setLoading(false);
   }

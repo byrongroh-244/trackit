@@ -197,12 +197,20 @@ export default function SettingsScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
       if (uid) {
+        // Delete all user data rows
         await Promise.all([
           supabase.from('assignments').delete().eq('user_id', uid),
           supabase.from('courses').delete().eq('user_id', uid),
           supabase.from('settings').delete().eq('user_id', uid),
         ]);
+        // Call the delete_user RPC which removes the auth.users record server-side
+        await supabase.rpc('delete_user');
       }
+      // Clear all local state
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {}
       await supabase.auth.signOut();
     } catch {
       setDeleteStatus('error');

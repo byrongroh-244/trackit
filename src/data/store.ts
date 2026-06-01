@@ -49,7 +49,7 @@ export interface AppSettings {
   onboardingComplete: boolean;
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   agendaLookaheadDays: 0,
   focusWorkMinutes: 10,
   focusBreakMinutes: 3,
