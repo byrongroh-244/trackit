@@ -440,147 +440,274 @@ function MonthView({ year, month, byDate, allAssignments, selectedKey, onSelectD
   );
 }
 
+export interface ClassPeriod {
+  name:      string;
+  color:     string;
+  days:      number[];   // 0=Sun, 1=Mon … 6=Sat
+  startHour: number;
+  startMin:  number;
+  endHour:   number;
+  endMin:    number;
+  room?:     string;
+  blockDay?: 'A' | 'B' | null;  // null = standard, 'A' or 'B' = block schedule rotation
+}
+
 // ── Week view ─────────────────────────────────────────────────────────────────
-function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay, onNavigate }: {
+// Identical visual to DayView — 7 columns side by side, same hour axis,
+// same class blocks, same free windows, same current-time line.
+function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay, onNavigate, dayOverrides, setOverride }: {
   weekStart: Date;
   byDate: Record<string, Assignment[]>;
   allAssignments: Assignment[];
   selectedKey: string | null;
   onSelectDay: (key: string) => void;
   onNavigate: (screen: any, id?: string) => void;
+  dayOverrides: Record<string, 'A' | 'B' | 'off'>;
+  setOverride: (key: string, val: 'A' | 'B' | 'off' | null) => void;
 }) {
-  const t = today();
+  const t   = today();
+  const now = new Date();
+  const todayKey = toKey(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const START_HOUR = 7;
+  const END_HOUR   = 18;
+  const HOUR_PX    = 56;
+  const totalH     = (END_HOUR - START_HOUR) * HOUR_PX;
+  const hours      = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+
+  function toY(h: number, m: number) { return ((h - START_HOUR) + m / 60) * HOUR_PX; }
+  function toH(sh: number, sm: number, eh: number, em: number) {
+    return ((eh - sh) + (em - sm) / 60) * HOUR_PX;
+  }
+
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);
     d.setDate(weekStart.getDate() + i);
     return d;
   });
 
-  const stepDates = new Set<string>();
-  for (const a of allAssignments) {
-    for (const s of a.subtasks ?? []) {
-      if (s.dueDate && !s.done) stepDates.add(s.dueDate);
-    }
+  // Load schedule only — overrides come from props
+  let schedule: ClassPeriod[] = [];
+  let scheduleType: 'standard' | 'block' = 'standard';
+  try {
+    const raw = localStorage.getItem('trackit_class_schedule');
+    if (raw) schedule = JSON.parse(raw);
+    scheduleType = (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard';
+  } catch {}
+
+  function getPeriodsForDay(d: Date): ClassPeriod[] {
+    const dow = d.getDay();
+    const key = toKey(d.getFullYear(), d.getMonth(), d.getDate());
+    const override = dayOverrides[key] as 'A' | 'B' | 'off' | undefined;
+    if (override === 'off') return [];
+    return schedule.filter(p => {
+      if (!p.days.includes(dow)) return false;
+      if (scheduleType !== 'block' || !p.blockDay) return true;
+      if (override === 'A' || override === 'B') return p.blockDay === override;
+      return true;
+    });
   }
 
-  const selectedItems = selectedKey ? (byDate[selectedKey] ?? []) : [];
+  function getFreeWindows(periods: ClassPeriod[]) {
+    if (periods.length === 0) return [];
+    type W = { startH: number; startM: number; endH: number; endM: number; label: string };
+    const wins: W[] = [];
+    const sorted = [...periods].sort((a,b) => a.startHour*60+a.startMin - (b.startHour*60+b.startMin));
+    let cursor = { h: START_HOUR, m: 0 };
+    for (const p of sorted) {
+      const gap = (p.startHour - cursor.h)*60 + (p.startMin - cursor.m);
+      if (gap >= 30) {
+        const dur = gap >= 60
+          ? `${Math.floor(gap/60)}h${gap%60>0?` ${gap%60}m`:''}`
+          : `${gap}m`;
+        wins.push({ startH: cursor.h, startM: cursor.m, endH: p.startHour, endM: p.startMin, label: dur });
+      }
+      cursor = { h: p.endHour, m: p.endMin };
+    }
+    const after = (END_HOUR - cursor.h)*60 - cursor.m;
+    if (after >= 30) {
+      const dur = after >= 60 ? `${Math.floor(after/60)}h${after%60>0?` ${after%60}m`:''}` : `${after}m`;
+      wins.push({ startH: cursor.h, startM: cursor.m, endH: END_HOUR, endM: 0, label: dur });
+    }
+    return wins;
+  }
+
+  const nowY = toY(now.getHours(), now.getMinutes());
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, padding: '8px 10px' }}>
-        {days.map(d => {
-          const key     = toKey(d.getFullYear(), d.getMonth(), d.getDate());
-          const items   = byDate[key] ?? [];
-          const active  = items.filter(a => !a.done);
-          const isToday = d.getFullYear() === t.y && d.getMonth() === t.m && d.getDate() === t.d;
-          const isSelected = key === selectedKey;
-          const hasStep = stepDates.has(key) && active.length === 0;
-          const tappable = items.length > 0 || stepDates.has(key);
-          const sorted  = sortedMarkers(active);
+      <div style={{ paddingBottom: 4 }}>
+        <div style={{ padding: '10px 10px 0' }}>
 
-          // Show up to 2 names inline if only 1-2 items; dots for 3+
-          const showNames = active.length > 0 && active.length <= 2;
+          {/* Day header row — identical typography to DayView assignment cards */}
+          <div style={{ display: 'flex', marginLeft: 40, marginBottom: 8 }}>
+            {days.map(d => {
+              const key    = toKey(d.getFullYear(), d.getMonth(), d.getDate());
+              const isToday = key === todayKey;
+              const override = dayOverrides[key] as 'A' | 'B' | 'off' | undefined;
+              const active  = (byDate[key] ?? []).filter(a => !a.done);
+              const u       = getUrgencyConfig(daysUntil(key));
+              return (
+                <div key={key} style={{ flex: 1, textAlign: 'center' }}>
+                  {/* Day name — same font as DayView hour labels */}
+                  <div style={{ fontSize: 10, fontWeight: 700, color: isToday ? Colors.forest : Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {DAYS[d.getDay()].slice(0,2)}
+                  </div>
+                  {/* Date number */}
+                  <div style={{ fontSize: 17, fontWeight: isToday ? 800 : 500, color: isToday ? Colors.forest : Colors.textPrimary, lineHeight: 1.1 }}>
+                    {d.getDate()}
+                  </div>
+                  {/* Lime pip under today */}
+                  {isToday && <div style={{ width: 14, height: 2.5, borderRadius: 2, background: '#B8E04A', margin: '2px auto' }} />}
+                  {/* A/B/off badge */}
+                  {(override === 'A' || override === 'B') && <div style={{ fontSize: 10, fontWeight: 700, color: Colors.forest }}>{override}-day</div>}
+                  {override === 'off' && <div style={{ fontSize: 10, fontWeight: 700, color: Colors.textHint }}>off</div>}
+                  {/* Due count badge */}
+                  {active.length > 0 && (
+                    <div style={{ fontSize: 11, fontWeight: 700, color: u.text, background: u.bg, borderRadius: 999, padding: '2px 7px', display: 'inline-block', marginTop: 3 }}>
+                      {active.length}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-          return (
-            <div
-              key={key}
-              onClick={() => tappable ? onSelectDay(key) : undefined}
-              style={{
-                minHeight: 86,
-                borderRadius: 12,
-                padding: '7px 5px 6px',
-                background: isSelected
-                  ? Colors.forest
-                  : isToday
-                  ? '#E8F4F5'
-                  : '#fff',
-                border: isToday && !isSelected
-                  ? `1.5px solid ${Colors.forest}`
-                  : isSelected
-                  ? 'none'
-                  : '1.5px solid #E3EBEA',
-                cursor: tappable ? 'pointer' : 'default',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                transition: 'border-color 0.15s, background 0.15s',
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: isSelected ? 'rgba(255,255,255,0.6)' : isToday ? Colors.forest : Colors.textHint }}>
-                {DAYS[d.getDay()]}
-              </div>
-              <div style={{ fontSize: 17, fontWeight: isToday || isSelected ? 700 : 500, color: isSelected ? '#fff' : isToday ? Colors.forest : Colors.textPrimary, lineHeight: 1.1 }}>
-                {d.getDate()}
-              </div>
+          {/* Time axis + 7 day columns */}
+          <div style={{ display: 'flex', width: '100%' }}>
 
-              {/* Lime pip under today */}
-              {isToday && !isSelected && (
-                <div style={{ width: 16, height: 2.5, borderRadius: 2, background: '#B8E04A' }} />
-              )}
+            {/* Hour labels — same style as DayView */}
+            <div style={{ width: 40, flexShrink: 0, position: 'relative', height: totalH }}>
+              {hours.map(h => (
+                <div key={h} style={{
+                  position: 'absolute',
+                  top: (h - START_HOUR) * HOUR_PX - 6,
+                  right: 6,
+                  fontSize: 10, fontWeight: 500, color: Colors.textHint, lineHeight: 1,
+                }}>
+                  {h === 12 ? '12pm' : h > 12 ? `${h-12}pm` : `${h}am`}
+                </div>
+              ))}
+            </div>
 
-              {/* Content: names if 1-2, dots if 3+ */}
-              {showNames ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%', marginTop: 1 }}>
-                  {active.slice(0, 2).map((a, idx) => {
-                    const urgColor = isSelected ? 'rgba(255,255,255,0.85)' : getUrgencyConfig(daysUntil(key)).accent;
+            {/* 7 columns */}
+            {days.map(d => {
+              const key      = toKey(d.getFullYear(), d.getMonth(), d.getDate());
+              const isToday  = key === todayKey;
+              const override = dayOverrides[key] as 'A' | 'B' | 'off' | undefined;
+              const isOff    = override === 'off';
+              const periods  = getPeriodsForDay(d);
+              const freeWins = getFreeWindows(periods);
+              const asgns    = (byDate[key] ?? []).filter(a => !a.done);
+
+              return (
+                <div key={key} style={{ flex: 1, position: 'relative', height: totalH, minWidth: 0 }}>
+
+                  {/* Hour grid lines — same as DayView */}
+                  {hours.map(h => (
+                    <div key={h} style={{
+                      position: 'absolute', top: (h - START_HOUR) * HOUR_PX, left: 0, right: 0,
+                      borderTop: '0.5px solid #E3EBEA', opacity: 0.6,
+                    }} />
+                  ))}
+
+                  {/* Left border — matches DayView borderLeft */}
+                  <div style={{
+                    position: 'absolute', top: 0, bottom: 0, left: 0,
+                    borderLeft: `0.5px solid ${isToday ? Colors.forest + '66' : '#E3EBEA'}`,
+                  }} />
+
+                  {/* Today background tint */}
+                  {isToday && (
+                    <div style={{ position: 'absolute', inset: 0, background: '#E8F4F508', pointerEvents: 'none' }} />
+                  )}
+
+                  {/* Current time line — same style as DayView: 1.5px lime + dot */}
+                  {isToday && nowY >= 0 && nowY <= totalH && (
+                    <div style={{ position: 'absolute', top: nowY, left: 0, right: 0, borderTop: '1.5px solid #B8E04A', zIndex: 4 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#B8E04A', marginTop: -4, marginLeft: -3 }} />
+                    </div>
+                  )}
+
+                  {/* Off / PIR overlay */}
+                  {isOff && (
+                    <div style={{ position: 'absolute', inset: 0, background: '#FEF0DC33', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: '#B86B12', writingMode: 'vertical-rl' as any, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Off</span>
+                    </div>
+                  )}
+
+                  {/* Free windows — same style as DayView: #E8F4F5 + dashed forest border */}
+                  {!isOff && freeWins.map((w, i) => (
+                    <div key={i} style={{
+                      position: 'absolute', left: 2, right: 2,
+                      top: toY(w.startH, w.startM),
+                      height: Math.max(toH(w.startH, w.startM, w.endH, w.endM) - 2, 14),
+                      background: '#E8F4F5',
+                      border: '1px dashed #1c4a4f',
+                      borderRadius: 6,
+                      zIndex: 1, overflow: 'hidden',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {/* Duration label — abbreviated for narrow columns */}
+                      <span style={{ fontSize: 10, color: '#1c4a4f', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 4px' }}>{w.label}</span>
+                    </div>
+                  ))}
+
+                  {/* Class period blocks — same style as DayView: color22 bg + 3px left border */}
+                  {!isOff && periods.map((p, i) => (
+                    <div key={i} style={{
+                      position: 'absolute', left: 2, right: 2,
+                      top: toY(p.startHour, p.startMin) + 1,
+                      height: Math.max(toH(p.startHour, p.startMin, p.endHour, p.endMin) - 2, 16),
+                      background: `${p.color}22`,
+                      borderRadius: 6,
+                      borderLeft: `3px solid ${p.color}`,
+                      padding: '3px 4px',
+                      zIndex: 2, overflow: 'hidden',
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: p.color, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.name}
+                      </div>
+                      {p.room && (
+                        <div style={{ fontSize: 10, color: p.color, opacity: 0.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.room}</div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Assignment chips — anchored above their class period */}
+                  {asgns.map((a, ai) => {
+                    const u      = getUrgencyConfig(daysUntil(key));
+                    const period = periods.find(p => p.name === a.className || p.color === a.classColor);
+                    const chipY  = period
+                      ? Math.max(2, toY(period.startHour, period.startMin) - 14 - ai * 13)
+                      : totalH - 14 - ai * 14;
                     return (
-                      <div key={idx} style={{
-                        width: '90%', fontSize: 11, fontWeight: 600,
-                        color: isSelected ? 'rgba(255,255,255,0.85)' : Colors.textPrimary,
-                        background: isSelected ? 'rgba(255,255,255,0.12)' : `${getUrgencyConfig(daysUntil(key)).bg}`,
-                        borderRadius: 4, padding: '2px 3px',
-                        textAlign: 'center',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        display: 'flex', alignItems: 'center', gap: 2,
-                      }}>
-                        {isTestOrQuiz(a.type) && (
-                          <svg width="5" height="5" viewBox="0 0 8 8" style={{ flexShrink: 0 }}>
-                            <rect x="1" y="1" width="6" height="6" rx="1" transform="rotate(45 4 4)" fill={urgColor} />
-                          </svg>
-                        )}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {a.name.split(' ').slice(0, 2).join(' ')}
-                        </span>
+                      <div
+                        key={a.id}
+                        onClick={() => { onSelectDay(key); onNavigate('detail', a.id); }}
+                        style={{
+                          position: 'absolute', left: 2, right: 2,
+                          top: Math.max(2, Math.min(totalH - 13, chipY)),
+                          height: 16,
+                          background: u.bg,
+                          borderRadius: 4,
+                          zIndex: 5, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', overflow: 'hidden', padding: '0 4px', gap: 3,
+                        }}
+                      >
+                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: u.accent, flexShrink: 0 }} />
+                        <div style={{ fontSize: 10, fontWeight: 700, color: u.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.name.split(' ').slice(0,2).join(' ')}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              ) : active.length >= 3 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2, marginTop: 2 }}>
-                  {sorted.slice(0, 4).map((a, idx) => (
-                    isTestOrQuiz(a.type) ? (
-                      <svg key={idx} width="7" height="7" viewBox="0 0 8 8">
-                        <rect x="1" y="1" width="6" height="6" rx="1" transform="rotate(45 4 4)"
-                          fill={isSelected ? '#fff' : getUrgencyConfig(daysUntil(key)).accent} />
-                      </svg>
-                    ) : (
-                      <span key={idx} style={{
-                        width: 6, height: 6, borderRadius: '50%',
-                        background: isSelected ? 'rgba(255,255,255,0.7)' : getUrgencyConfig(daysUntil(key)).accent,
-                        display: 'inline-block',
-                      }} />
-                    )
-                  ))}
-                  {active.length > 4 && (
-                    <span style={{ fontSize: 8, color: isSelected ? 'rgba(255,255,255,0.6)' : Colors.textHint, lineHeight: 1.8 }}>
-                      +{active.length - 4}
-                    </span>
-                  )}
-                </div>
-              ) : hasStep ? (
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: isSelected ? 'rgba(255,255,255,0.5)' : Colors.textHint, display: 'inline-block', marginTop: 2 }} />
-              ) : null}
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        </div>
       </div>
-
-      {selectedKey && (
-        <DayPanel
-          dateKey={selectedKey}
-          items={selectedItems}
-          allAssignments={allAssignments}
-          onNavigate={onNavigate}
-        />
-      )}
 
       <UpcomingTestsBanner byDate={byDate} onNavigate={onNavigate} />
     </div>
@@ -598,6 +725,39 @@ export default function CalendarScreen() {
   const [year,        setYear]        = useState(t.y);
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  // ── Shared A/B day override state — used by both WeekView and DayView ────────
+  const [dayOverrides, setDayOverrides] = useState<Record<string, 'A' | 'B' | 'off'>>(() => {
+    try { return JSON.parse(localStorage.getItem('trackit_day_overrides') ?? '{}'); } catch { return {}; }
+  });
+
+  function setOverride(key: string, val: 'A' | 'B' | 'off' | null) {
+    setDayOverrides(prev => {
+      const next = { ...prev };
+      if (val === null) {
+        delete next[key];
+      } else {
+        next[key] = val;
+        // Cascade: infer next 14 weekdays alternating A/B
+        if (val === 'A' || val === 'B') {
+          let current = val;
+          const base  = new Date(key + 'T00:00:00');
+          let count   = 0;
+          for (let i = 1; i <= 28 && count < 14; i++) {
+            const dd = new Date(base);
+            dd.setDate(base.getDate() + i);
+            if (dd.getDay() === 0 || dd.getDay() === 6) continue;
+            const k = toKey(dd.getFullYear(), dd.getMonth(), dd.getDate());
+            current = current === 'A' ? 'B' : 'A';
+            if (!next[k]) next[k] = current;
+            count++;
+          }
+        }
+      }
+      try { localStorage.setItem('trackit_day_overrides', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
 
   // ── Swipe to navigate ─────────────────────────────────────────────────────
   const touchStartX = useRef<number | null>(null);
@@ -761,6 +921,8 @@ export default function CalendarScreen() {
               dateKey={dayKey}
               allAssignments={assignments}
               onNavigate={navigate}
+              dayOverrides={dayOverrides}
+              setOverride={setOverride}
             />
           ) : viewMode === 'week' ? (
             <WeekView
@@ -770,6 +932,8 @@ export default function CalendarScreen() {
               selectedKey={selectedKey}
               onSelectDay={(key) => { setSelectedKey(key); setDayKey(key); }}
               onNavigate={navigate}
+              dayOverrides={dayOverrides}
+              setOverride={setOverride}
             />
           ) : (
             <MonthView
@@ -813,15 +977,16 @@ export interface ScheduleSettings {
   blockCycleStart?: 'A' | 'B'; // what day is "this Monday"
 }
 
-function DayView({ dateKey, allAssignments, onNavigate }: {
+function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverride }: {
   dateKey:        string;
   allAssignments: Assignment[];
   onNavigate:     (screen: any, id?: string) => void;
+  dayOverrides:   Record<string, 'A' | 'B' | 'off'>;
+  setOverride:    (key: string, val: 'A' | 'B' | 'off' | null) => void;
 }) {
   const d    = new Date(dateKey + 'T00:00:00');
   const dow  = d.getDay();
 
-  // Load class schedule from localStorage — use state for overrides so UI updates immediately
   let schedule: ClassPeriod[] = [];
   let scheduleType: 'standard' | 'block' = 'standard';
   try {
@@ -829,41 +994,6 @@ function DayView({ dateKey, allAssignments, onNavigate }: {
     if (raw) schedule = JSON.parse(raw);
     scheduleType = (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard';
   } catch {}
-
-  // Override state — local so buttons re-render immediately
-  const [dayOverrides, setDayOverrides] = React.useState<Record<string, 'A' | 'B' | 'off'>>(() => {
-    try { return JSON.parse(localStorage.getItem('trackit_day_overrides') ?? '{}'); } catch { return {}; }
-  });
-
-  function setOverride(key: string, val: 'A' | 'B' | 'off' | null) {
-    setDayOverrides(prev => {
-      const next = { ...prev };
-      if (val === null) { delete next[key]; }
-      else {
-        next[key] = val;
-        // ── Cascade inference ──────────────────────────────────────────────
-        // If user marks a date, infer the next 14 weekdays alternating A/B
-        // Skip weekends, only fill days not already overridden
-        if (val === 'A' || val === 'B') {
-          let current = val;
-          const base = new Date(key + 'T00:00:00');
-          let count = 0;
-          for (let i = 1; i <= 28 && count < 14; i++) {
-            const d = new Date(base);
-            d.setDate(base.getDate() + i);
-            const dow = d.getDay();
-            if (dow === 0 || dow === 6) continue; // skip weekends
-            const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            current = current === 'A' ? 'B' : 'A';
-            if (!next[k]) next[k] = current; // don't overwrite existing overrides
-            count++;
-          }
-        }
-      }
-      try { localStorage.setItem('trackit_day_overrides', JSON.stringify(next)); } catch {}
-      return next;
-    });
-  }
 
   const dayOverride = dayOverrides[dateKey] as 'A' | 'B' | 'off' | undefined;
   const isOff = dayOverride === 'off';
