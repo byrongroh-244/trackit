@@ -59,11 +59,11 @@ function fromDbAssignment(row: any): Assignment {
 }
 
 function toDbCourse(c: Course, uid: string) {
-  return { id: c.id, user_id: uid, name: c.name, color: c.color, description: c.description ?? '', teacher_name: c.teacherName ?? '', canvas_name: c.canvasName ?? '' };
+  return { id: c.id, user_id: uid, name: c.name, color: c.color, description: c.description ?? '', teacher_name: c.teacherName ?? '', canvas_name: c.canvasName ?? '', canvas_id: c.canvasId ?? null };
 }
 
 function fromDbCourse(row: any): Course {
-  return { id: row.id, name: row.name, color: row.color, description: row.description ?? '', teacherName: row.teacher_name ?? '', canvasName: row.canvas_name ?? '' };
+  return { id: row.id, name: row.name, color: row.color, description: row.description ?? '', teacherName: row.teacher_name ?? '', canvasName: row.canvas_name ?? '', canvasId: row.canvas_id ?? undefined };
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -324,6 +324,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Clear local state regardless — even if the DB call failed, local UI resets
     setAssignments([]); setCourses([]); setScreen('today'); setDetailId(null);
+    // Clear Canvas sync state so next sync starts fresh
+    try {
+      localStorage.removeItem('trackit_canvas_selected_ids');
+    } catch {}
   }, []);
 
   // ── signOut ────────────────────────────────────────────────────────────────

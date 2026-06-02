@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../hooks/useApp';
-import { uid, daysUntil, fetchCanvasCourses, importFromCanvas } from '../data/store';
+import { uid, daysUntil } from '../data/store';
 import { Colors, CLASS_COLORS, SECTION_META, getSectionForDays, getSubjectIconPaths, type Section } from '../theme';
 import AssignmentCard from '../components/AssignmentCard';
 import { Screen, ScrollBody, BottomNav, SectionLabel, EmptyState, ConfirmSheet } from '../components/UI';
@@ -53,17 +53,59 @@ export default function ClassesScreen() {
     if (!canvasDomain || !canvasToken) { navigate('canvas'); return; }
     setSyncing(true); setSyncMsg('');
     try {
-      const result = await importFromCanvas(
-        canvasDomain, canvasToken,
-        courses.map(c => c.color), CLASS_COLORS,
-        settings?.gradeLevel ?? '',
-        canvasIds.length > 0 ? canvasIds : undefined,
-      );
-      const existingNames = new Set(courses.map(c => c.name.toLowerCase().trim()));
-      const freshCourses  = result.courses.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
-      await updateCourses([...courses, ...freshCourses]);
-      await upsertAssignments(result.assignments);
-      setSyncMsg(`Synced ${result.assignments.length} assignment${result.assignments.length !== 1 ? 's' : ''}`);
+      const clean = canvasDomain.replace(/https?:\/\//, '').replace(/\/$/, '');
+      const PROXY = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/canvas-proxy';
+      const ANON  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
+
+      async function canvasFetch(path: string) {
+        const res = await fetch(PROXY, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON}`, 'apikey': ANON },
+          body: JSON.stringify({ domain: clean, token: canvasToken, path }),
+        });
+        if (!res.ok) throw new Error(`Canvas error ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        return data;
+      }
+
+      // Only sync courses that are already in the app (matched by canvasId)
+      // Do NOT add new courses here — user must go through CanvasScreen for that
+      const knownCourses = courses.filter(c => c.canvasId && (
+        canvasIds.length === 0 || canvasIds.includes(c.canvasId)
+      ));
+
+      if (knownCourses.length === 0) {
+        setSyncMsg('No Canvas classes to sync — open Canvas settings first');
+        setTimeout(() => setSyncMsg(''), 3000);
+        setSyncing(false);
+        return;
+      }
+
+      const newAssignments: import('../types').Assignment[] = [];
+      for (const appCourse of knownCourses) {
+        if (!appCourse.canvasId) continue;
+        const asgns = await canvasFetch(
+          `courses/${appCourse.canvasId}/assignments?per_page=50&order_by=due_at`
+        ) as Array<{ name: string; due_at?: string; description?: string; submission_types?: string[] }>;
+
+        if (!Array.isArray(asgns)) continue;
+        for (const a of asgns) {
+          if (!a.due_at) continue;
+          if (a.submission_types?.includes('not_graded') && a.submission_types.length === 1) continue;
+          const dueDate = a.due_at.split('T')[0];
+          newAssignments.push({
+            id: uid(), name: a.name,
+            classId: null as any, className: appCourse.name, classColor: appCourse.color,
+            dueDate, done: false,
+            notes: (a.description ?? '').replace(/<[^>]*>/g, '').slice(0, 300),
+            type: 'homework' as any, effort: null, subtasks: [],
+          });
+        }
+      }
+
+      await upsertAssignments(newAssignments);
+      setSyncMsg(`Synced ${newAssignments.length} assignment${newAssignments.length !== 1 ? 's' : ''}`);
       setTimeout(() => setSyncMsg(''), 3000);
     } catch (err: any) {
       setSyncMsg('Sync failed — check Canvas settings');

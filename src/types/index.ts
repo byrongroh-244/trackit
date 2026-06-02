@@ -31,6 +31,7 @@ export interface Course {
   description?: string;
   teacherName?: string;
   canvasName?: string;  // original Canvas name, used for sync dedup
+  canvasId?: number;    // Canvas course ID, most reliable match key
 }
 
 export type UrgencyConfig = {

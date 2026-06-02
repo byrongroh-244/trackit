@@ -303,6 +303,7 @@ export async function importFromCanvas(
   colorPalette: readonly string[],
   gradeLevel = '',
   selectedCourseIds?: number[],   // if provided, only import these courses
+  existingCourses: Course[] = [], // pass app courses so we can use renamed display names
 ): Promise<CanvasImportResult> {
   const clean = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
 
@@ -320,8 +321,13 @@ export async function importFromCanvas(
     const cc    = toImport[i];
     const color = colorPalette.find(c => !usedColors.has(c)) ?? colorPalette[i % colorPalette.length];
     usedColors.add(color);
-    const course: Course = { id: uid(), name: cc.name, color, canvasName: cc.name };
-    newCourses.push(course);
+    // Use existing course's display name if already in app (handles renames)
+    const existingCourse = existingCourses.find(c => c.canvasId === cc.id);
+    const displayName    = existingCourse?.name ?? cc.name;
+    const courseColor    = existingCourse?.color ?? color;
+    const courseId       = existingCourse?.id    ?? uid();
+    const course: Course = { id: courseId, name: displayName, color: courseColor, canvasName: cc.name, canvasId: cc.id };
+    if (!existingCourse) newCourses.push(course);
     try {
       // No bucket filter — gets all assignments including test/sandbox ones
       // Higher per_page to avoid missing assignments in large courses
