@@ -29,6 +29,8 @@ export interface Course {
   name: string;
   color: string;
   description?: string;
+  teacherName?: string;
+  canvasName?: string;  // original Canvas name, used for sync dedup
 }
 
 export type UrgencyConfig = {

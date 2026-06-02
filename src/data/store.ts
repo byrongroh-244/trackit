@@ -320,7 +320,7 @@ export async function importFromCanvas(
     const cc    = toImport[i];
     const color = colorPalette.find(c => !usedColors.has(c)) ?? colorPalette[i % colorPalette.length];
     usedColors.add(color);
-    const course: Course = { id: uid(), name: cc.name, color };
+    const course: Course = { id: uid(), name: cc.name, color, canvasName: cc.name };
     newCourses.push(course);
     try {
       // No bucket filter — gets all assignments including test/sandbox ones

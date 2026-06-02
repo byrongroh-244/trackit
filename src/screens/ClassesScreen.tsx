@@ -36,6 +36,10 @@ function ClassIcon({ name, color, size = 44 }: { name: string; color: string; si
 
 export default function ClassesScreen() {
   const { courses, assignments, settings, updateCourses, updateAssignments, upsertAssignments, navigate, patchAssignment } = useApp();
+  const normName = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+  const matchesClass = (a: import('../types').Assignment, c: import('../types').Course) =>
+    a.classId === c.id || (!a.classId && normName(a.className) === normName(c.name));
+
   const [adding,        setAdding]        = useState(false);
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState('');
@@ -68,34 +72,47 @@ export default function ClassesScreen() {
     }
   }
   const [newName,       setNewName]       = useState('');
+  const [newTeacher,    setNewTeacher]    = useState('');
   const [selectedColor, setSelectedColor] = useState<string>(CLASS_COLORS[0]);
   const [selectedClass, setSelectedClass] = useState<Course | null>(null);
   const [showDone,      setShowDone]      = useState(false);
   const [editingId,     setEditingId]     = useState<string | null>(null);
+  const [editingClass,  setEditingClass]  = useState(false);
   const [editName,      setEditName]      = useState('');
+  const [editTeacher,   setEditTeacher]   = useState('');
   const [editColor,     setEditColor]     = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   function startEdit(c: Course, e: React.MouseEvent) {
     e.stopPropagation();
-    setEditingId(c.id); setEditName(c.name); setEditColor(c.color);
+    setEditingId(c.id); setEditName(c.name); setEditColor(c.color); setEditTeacher(c.teacherName ?? '');
   }
   function saveEdit() {
     if (!editName.trim() || !editingId) return;
-    const updated = courses.map(c => c.id === editingId ? { ...c, name: editName.trim(), color: editColor } : c);
-    updateCourses(updated);
+    const oldCourse = courses.find(c => c.id === editingId);
+    // Match assignments by classId OR old display name OR original canvas name
     const updatedAssignments = assignments.map(a =>
-      (a.classId === editingId || (!a.classId && a.className === (courses.find(x => x.id === editingId)?.name ?? ''))) ? { ...a, className: editName.trim(), classColor: editColor } : a
+      (a.classId === editingId ||
+       (!a.classId && a.className === (oldCourse?.name ?? '')) ||
+       (!a.classId && a.className === (oldCourse?.canvasName ?? ''))
+      ) ? { ...a, className: editName.trim(), classColor: editColor } : a
     );
-    updateAssignments(updatedAssignments, updatedAssignments.filter(a => a.classId === editingId || (!a.classId && a.className === editName.trim())));
+    const updated = courses.map(c => c.id === editingId
+      ? { ...c, name: editName.trim(), color: editColor, teacherName: editTeacher.trim() }
+      : c
+    );
+    updateCourses(updated);
+    updateAssignments(updatedAssignments, updatedAssignments.filter(a =>
+      a.classId === editingId || (!a.classId && a.className === editName.trim())
+    ));
     setEditingId(null);
   }
   function cancelEdit() { setEditingId(null); }
 
   function addCourse() {
     if (!newName.trim()) return;
-    updateCourses([...courses, { id: uid(), name: newName.trim(), color: selectedColor }]);
-    setNewName(''); setAdding(false);
+    updateCourses([...courses, { id: uid(), name: newName.trim(), color: selectedColor, teacherName: newTeacher.trim() }]);
+    setNewName(''); setNewTeacher(''); setAdding(false);
   }
   function deleteCourse(id: string) { setConfirmDeleteId(id); }
   function confirmDeleteCourse() {
@@ -112,7 +129,7 @@ export default function ClassesScreen() {
   // ── Class detail view ──────────────────────────────────────────────────────
   if (selectedClass) {
     const liveClass        = courses.find(c => c.id === selectedClass.id) ?? selectedClass;
-    const classAssignments = assignments.filter(a => a.classId === liveClass.id || (!a.classId && a.className === liveClass.name));
+    const classAssignments = assignments.filter(a => matchesClass(a, liveClass));
     const active           = classAssignments.filter(a => !a.done);
     const done             = classAssignments.filter(a => a.done);
 
@@ -141,11 +158,56 @@ export default function ClassesScreen() {
                 </div>
               </div>
             </div>
-            <ClassIcon name={liveClass.name} color="rgba(255,255,255,0.6)" size={40} />
+            <button
+              onClick={() => { setEditingId(liveClass.id); setEditName(liveClass.name); setEditColor(liveClass.color); setEditTeacher(liveClass.teacherName ?? ''); setEditingClass(true); }}
+              aria-label="Edit class"
+              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 10, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
           </div>
           {/* Class color accent bar */}
           <div style={{ height: 3, background: liveClass.color, borderRadius: '2px 2px 0 0', margin: '0 -0px' }} />
         </div>
+
+        {/* Inline edit sheet — slides in below header */}
+        {editingClass && editingId === liveClass.id && (
+          <div style={{ background: '#fff', borderBottom: '1.5px solid #E3EBEA', padding: '16px 18px', flexShrink: 0 }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 7 }}>Class name</label>
+              <input
+                autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { saveEdit(); setEditingClass(false); } if (e.key === 'Escape') { cancelEdit(); setEditingClass(false); } }}
+                style={{ width: '100%', fontSize: 15, color: Colors.textPrimary, background: Colors.background, border: '1.5px solid #E3EBEA', borderRadius: 10, padding: '10px 12px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 7 }}>Teacher <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 11, opacity: 0.7 }}>(optional)</span></label>
+              <input
+                value={editTeacher} onChange={e => setEditTeacher(e.target.value)}
+                placeholder="e.g. Ms. Johnson"
+                style={{ width: '100%', fontSize: 14, color: Colors.textPrimary, background: Colors.background, border: '1.5px solid #E3EBEA', borderRadius: 10, padding: '10px 12px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 10 }}>Color</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {CLASS_COLORS.map(col => (
+                  <button key={col} onClick={() => setEditColor(col)} style={{ width: 30, height: 30, borderRadius: '50%', background: col, cursor: 'pointer', border: `2px solid ${editColor === col ? '#fff' : 'transparent'}`, boxShadow: editColor === col ? `0 0 0 2px ${Colors.forest}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'box-shadow 0.15s' }}>
+                    {editColor === col ? <IconCheck size={13} color="#fff" /> : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { cancelEdit(); setEditingClass(false); }} style={{ flex: 1, border: '1.5px solid #E3EBEA', background: '#fff', borderRadius: 10, padding: 11, fontSize: 14, color: Colors.textSecondary, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={() => { saveEdit(); setEditingClass(false); }} style={{ flex: 1, background: Colors.forest, color: '#fff', border: 'none', borderRadius: 10, padding: 11, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Save</button>
+            </div>
+          </div>
+        )}
 
         <ScrollBody hasNav>
           {classAssignments.length === 0 ? (
@@ -287,7 +349,7 @@ export default function ClassesScreen() {
           )}
 
           {courses.map(c => {
-            const activeCount = assignments.filter(a => (a.classId === c.id || (!a.classId && a.className === c.name)) && !a.done).length;
+            const activeCount = assignments.filter(a => matchesClass(a, c) && !a.done).length;
             const isEditing   = editingId === c.id;
 
             // ── Edit form ──
@@ -302,7 +364,14 @@ export default function ClassesScreen() {
                     style={{ width: '100%', fontSize: 15, color: Colors.textPrimary, background: Colors.background, border: '0.5px solid rgba(0,0,0,0.15)', borderRadius: 10, padding: '10px 12px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
                   />
                   <div style={{ marginTop: 14, marginBottom: 4 }}>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 10 }}>Color</label>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 7 }}>Teacher name <span style={{ fontWeight: 400, fontSize: 11, textTransform: 'none', letterSpacing: 0, opacity: 0.7 }}>(optional)</span></label>
+                  <input
+                    value={editTeacher}
+                    onChange={e => setEditTeacher(e.target.value)}
+                    placeholder="e.g. Ms. Johnson"
+                    style={{ width: '100%', fontSize: 14, color: Colors.textPrimary, background: Colors.background, border: '1.5px solid #E3EBEA', borderRadius: 10, padding: '10px 12px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: 14 }}
+                  />
+                  <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 10 }}>Color</label>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                       {CLASS_COLORS.map(col => (
                         <button key={col} onClick={() => setEditColor(col)} style={{ width: 32, height: 32, borderRadius: '50%', background: col, cursor: 'pointer', border: `2px solid ${editColor === col ? '#fff' : 'transparent'}`, boxShadow: editColor === col ? `0 0 0 2px ${Colors.forest}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'box-shadow 0.15s' }}>

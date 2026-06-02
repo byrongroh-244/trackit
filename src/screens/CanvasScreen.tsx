@@ -68,21 +68,39 @@ export default function CanvasScreen() {
         gradeLevel,
         selectedIds,
       );
-      // Names of all Canvas courses (all of them, not just selected)
-      const allCanvasNames = new Set(canvasCourses.map(c => c.name.toLowerCase().trim()));
-      // Names of selected courses only
-      const selectedNames  = new Set(
+      // Build a set of all Canvas course names (original, from Canvas API)
+      const allCanvasNames      = new Set(canvasCourses.map(c => c.name.toLowerCase().trim()));
+      const selectedCanvasNames = new Set(
         canvasCourses.filter(c => selectedIds.includes(c.id)).map(c => c.name.toLowerCase().trim())
       );
-      // Remove courses that came from Canvas but are not in the current selection
-      const prunedCourses = courses.filter(c => {
-        const nameLower = c.name.toLowerCase().trim();
-        // Keep if it was never a Canvas course, or if it is in the selected set
-        return !allCanvasNames.has(nameLower) || selectedNames.has(nameLower);
+
+      // For each existing course, get the Canvas name to match against.
+      // Priority: stored canvasName → display name. This handles:
+      //   - First sync: canvasName not yet saved, use display name (same as canvas)
+      //   - After rename: canvasName = original canvas name, display name = renamed
+      const getCanvasKey = (c: import('../types').Course) =>
+        (c.canvasName || c.name).toLowerCase().trim();
+
+      // Save canvasName on all existing courses that came from Canvas but don't have it stored yet
+      // (migration: backfill canvasName = name for any canvas course missing it)
+      const coursesWithCanvasName = courses.map(c => {
+        if (!c.canvasName && allCanvasNames.has(c.name.toLowerCase().trim())) {
+          return { ...c, canvasName: c.name };
+        }
+        return c;
       });
-      // Add any newly selected courses not already in the list
-      const existingNames = new Set(prunedCourses.map(c => c.name.toLowerCase().trim()));
-      const freshCourses  = result.courses.filter(c => !existingNames.has(c.name.toLowerCase().trim()));
+
+      // Remove courses from Canvas no longer in selection
+      const prunedCourses = coursesWithCanvasName.filter(c => {
+        const key = getCanvasKey(c);
+        return !allCanvasNames.has(key) || selectedCanvasNames.has(key);
+      });
+
+      // Only add courses whose canvasName isn't already tracked
+      const existingKeys = new Set(prunedCourses.map(getCanvasKey));
+      const freshCourses = result.courses.filter(c =>
+        !existingKeys.has((c.canvasName || c.name).toLowerCase().trim())
+      );
       // Await courses first — assignments have a FK constraint on class_id
       await updateCourses([...prunedCourses, ...freshCourses]);
       await upsertAssignments(result.assignments);

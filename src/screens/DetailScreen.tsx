@@ -6,7 +6,6 @@ import { Screen, ScrollBody, CheckCircle, SaveButton, ConfirmSheet, useToast } f
 import { IconTrash, IconZap, IconClock, IconBattery, IconParty, IconCircleCheck, IconRefreshCw, IconArrowLeft } from '../components/Icons';
 import FocusTimer from '../components/FocusTimer';
 import AdvocacySheet from '../components/AdvocacySheet';
-import DeadlineRecovery from '../components/DeadlineRecovery';
 import { Styles } from '../styles';
 import type { Assignment, AssignmentType, AssignmentEffort, Subtask } from '../types';
 
@@ -233,6 +232,7 @@ export default function DetailScreen() {
         <AdvocacySheet
           assignmentName={a.name}
           className={a.className}
+          teacherName={courses.find(c => c.id === a.classId || c.name === a.className)?.teacherName}
           dueDate={a.dueDate}
           daysUntil={days}
           onClose={() => setShowAdvocacy(false)}
@@ -404,23 +404,7 @@ export default function DetailScreen() {
             <>
 
 
-              {/* ── Deadline recovery ── */}
-              {isPastDue && (
-                <DeadlineRecovery
-                  assignment={a}
-                  studentName={settings.gradeLevel ? `Student` : 'Student'}
-                  onLogCommunication={log => {
-                    patchAssignment({
-                      ...a,
-                      communications: [...(a.communications ?? []), log],
-                    });
-                  }}
-                  onNewDeadline={date => {
-                    patchAssignment({ ...a, dueDate: date });
-                    showToast('New deadline saved', 'success');
-                  }}
-                />
-              )}
+
 
               {/* ── Post-focus panel ── */}
               {showPostFocusPanel && (() => {
@@ -674,19 +658,19 @@ export default function DetailScreen() {
                 </span>
               </button>
             )}
-            {/* Talk to teacher — advocacy button */}
-            <button
-              onClick={() => setShowAdvocacy(true)}
-              aria-label="Get help talking to your teacher"
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, border: `1.5px solid #E3EBEA`, background: '#fff', color: Colors.textSecondary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={days < 0 ? Colors.red : Colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-              <span style={{ color: days < 0 ? Colors.red : Colors.textSecondary }}>
+            {/* Talk to teacher — AdvocacySheet for all non-done assignments */}
+            {!a.done && (
+              <button
+                onClick={() => setShowAdvocacy(true)}
+                aria-label="Talk to your teacher"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, border: `1.5px solid ${days < 0 ? Colors.red + '40' : '#E3EBEA'}`, background: days < 0 ? Colors.redLight : '#fff', color: days < 0 ? Colors.red : Colors.textSecondary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
                 {days < 0 ? 'Get help — this is overdue' : 'Talk to your teacher'}
-              </span>
-            </button>
+              </button>
+            )}
 
             {/* Mark as done — green */}
             <button

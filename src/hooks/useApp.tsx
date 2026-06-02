@@ -59,11 +59,11 @@ function fromDbAssignment(row: any): Assignment {
 }
 
 function toDbCourse(c: Course, uid: string) {
-  return { id: c.id, user_id: uid, name: c.name, color: c.color, description: c.description ?? '' };
+  return { id: c.id, user_id: uid, name: c.name, color: c.color, description: c.description ?? '', teacher_name: c.teacherName ?? '', canvas_name: c.canvasName ?? '' };
 }
 
 function fromDbCourse(row: any): Course {
-  return { id: row.id, name: row.name, color: row.color, description: row.description ?? '' };
+  return { id: row.id, name: row.name, color: row.color, description: row.description ?? '', teacherName: row.teacher_name ?? '', canvasName: row.canvas_name ?? '' };
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -175,9 +175,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (added.length === 0) return;
 
     setAssignments(prev => {
-      const existingKeys = new Set(prev.map(a => `${a.name}||${a.dueDate}||${a.className}`));
-      const fresh = added.filter(a => !existingKeys.has(`${a.name}||${a.dueDate}||${a.className}`));
-      return [...prev, ...fresh];
+      const keyToId = new Map(prev.map(a => [`${a.name}||${a.dueDate}||${a.className}`, a.id]));
+      const merged  = added.map(a => {
+        const key = `${a.name}||${a.dueDate}||${a.className}`;
+        return keyToId.has(key) ? { ...a, id: keyToId.get(key)! } : a;
+      });
+      const existingIds = new Set(prev.map(a => a.id));
+      const fresh = merged.filter(a => !existingIds.has(a.id));
+      // Replace existing records with updated ones, add new ones
+      return [...prev.filter(a => !merged.find(m => m.id === a.id)), ...merged];
     });
 
     // Wait up to 3s for userId if it hasn't resolved yet (e.g. right after Canvas sync)
@@ -191,33 +197,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (!uid) { console.error('upsertAssignments: no userId after wait'); return; }
 
-    // Deduplicate against existing assignments by name+dueDate+className
-    // so re-syncing Canvas never creates duplicates
+    // Fetch existing IDs keyed by name+dueDate+className so we can
+    // upsert (update if exists, insert if new) rather than skip duplicates.
+    // This means re-syncing Canvas always reflects the latest Canvas data.
     const { data: existing } = await supabase
       .from('assignments')
-      .select('name, due_date, class_name')
+      .select('id, name, due_date, class_name')
       .eq('user_id', uid!);
 
-    const existingKeys = new Set(
-      (existing ?? []).map((r: any) => `${r.name}||${r.due_date}||${r.class_name}`)
+    const existingIdMap = new Map<string, string>(
+      (existing ?? []).map((r: any) => [`${r.name}||${r.due_date}||${r.class_name}`, r.id])
     );
 
-    const fresh = added.filter(a =>
-      !existingKeys.has(`${a.name}||${a.dueDate}||${a.className}`)
-    );
+    // Reuse existing IDs for matching records so upsert works correctly
+    const toWrite = added.map(a => {
+      const key = `${a.name}||${a.dueDate}||${a.className}`;
+      const existingId = existingIdMap.get(key);
+      return { ...a, id: existingId ?? a.id };
+    });
 
-    if (fresh.length === 0) {
-      console.log('upsertAssignments: no new assignments to insert');
-      return;
-    }
-
-    // Insert fresh records in batches of 20
-    for (let i = 0; i < fresh.length; i += 20) {
-      const batch = fresh.slice(i, i + 20);
+    // Upsert in batches of 20
+    for (let i = 0; i < toWrite.length; i += 20) {
+      const batch = toWrite.slice(i, i + 20);
       const rows  = batch.map(a => toDbAssignment(a, uid!));
       const { error } = await supabase
         .from('assignments')
-        .insert(rows);
+        .upsert(rows, { onConflict: 'id' });
       if (error) console.error('upsertAssignments error:', error.code, error.message);
     }
   }, []);
