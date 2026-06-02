@@ -109,6 +109,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentSemester:      sData.current_semester        ?? 'fall',
         onboardingComplete:   sData.onboarding_complete     ?? false,
         microstepsEnabled:    sData.microsteps_enabled       ?? true,
+        termsAccepted:        sData.terms_accepted           ?? false,
       };
       setSettings(s);
       saveSettings(s);
@@ -295,6 +296,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       current_semester:      s.currentSemester,
       onboarding_complete:   s.onboardingComplete,
       microsteps_enabled:    s.microstepsEnabled ?? true,
+      terms_accepted:        s.termsAccepted     ?? false,
     }, { onConflict: 'user_id' });
 
     if (error) console.error('updateSettings error:', error);

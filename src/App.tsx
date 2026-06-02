@@ -7,6 +7,7 @@ import TrackItLogo from './components/TrackItLogo';
 import AuthScreen      from './screens/AuthScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import TodayScreen     from './screens/TodayScreen';
+import TermsScreen     from './screens/TermsScreen';
 
 // ── Lazy — split into separate chunks, loaded on first visit ─────────────────
 const AddScreen      = lazy(() => import('./screens/AddScreen'));
@@ -29,7 +30,7 @@ function ScreenFallback() {
 }
 
 function Router() {
-  const { screen, settings, navigate } = useApp();
+  const { screen, settings, navigate, updateSettings } = useApp();
   const [authed, setAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -55,6 +56,15 @@ function Router() {
 
   // Not logged in
   if (!authed) return <AuthScreen onAuth={() => setAuthed(true)} />;
+
+  // Needs terms acceptance — shown to all users who haven't accepted yet
+  if (!settings.termsAccepted) {
+    return (
+      <TermsScreen
+        onAccept={() => updateSettings({ ...settings, termsAccepted: true })}
+      />
+    );
+  }
 
   // Needs onboarding
   if (!settings.onboardingComplete) {

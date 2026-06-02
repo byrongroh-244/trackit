@@ -48,6 +48,7 @@ export interface AppSettings {
   currentSemester: string;
   onboardingComplete: boolean;
   microstepsEnabled: boolean;
+  termsAccepted: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   currentSemester: 'fall',
   onboardingComplete: false,
   microstepsEnabled: true,
+  termsAccepted: false,
 };
 
 export function loadSettings(): AppSettings {
@@ -250,13 +252,23 @@ export async function generateSubtasks(name: string, dueDate: string, gradeLevel
 }
 
 // ── Canvas API ─────────────────────────────────────────────────────────────────
-const CORS_PROXY = 'https://corsproxy.io/?';
+const SUPABASE_CANVAS_PROXY = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/canvas-proxy';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
 
 async function canvasFetch(domain: string, token: string, path: string): Promise<any> {
-  const url = `${CORS_PROXY}https://${domain}/api/v1/${path}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const clean = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
+  const res = await fetch(SUPABASE_CANVAS_PROXY, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ domain: clean, token, path }),
+  });
   if (!res.ok) throw new Error(`Canvas returned ${res.status}. Check your URL and token.`);
-  return res.json();
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 export interface CanvasCourse {
