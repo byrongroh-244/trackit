@@ -128,7 +128,7 @@ export default function ClassesScreen() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <button
                 onClick={() => { setSelectedClass(null); setShowDone(false); }}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+                aria-label="Go back" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
               >
                 <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
               </button>

@@ -147,7 +147,7 @@ export default function CanvasScreen() {
     <Screen>
       <div style={{ background: Colors.forest, padding: '18px 20px 18px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-          <button onClick={() => navigate('classes')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={() => navigate('classes')} aria-label="Go back" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
             <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
           </button>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>Select courses</div>
@@ -265,7 +265,7 @@ export default function CanvasScreen() {
     <Screen>
       <div style={{ background: Colors.forest, padding: '18px 20px 18px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('classes')} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={() => navigate('classes')} aria-label="Go back" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
             <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
           </button>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>Connect Canvas</div>

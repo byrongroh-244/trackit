@@ -5,6 +5,7 @@ import { Colors, getUrgencyConfig } from '../theme';
 import { Screen, ScrollBody, CheckCircle, SaveButton, ConfirmSheet, useToast } from '../components/UI';
 import { IconTrash, IconZap, IconClock, IconBattery, IconParty, IconCircleCheck, IconRefreshCw, IconArrowLeft } from '../components/Icons';
 import FocusTimer from '../components/FocusTimer';
+import AdvocacySheet from '../components/AdvocacySheet';
 import DeadlineRecovery from '../components/DeadlineRecovery';
 import { Styles } from '../styles';
 import type { Assignment, AssignmentType, AssignmentEffort, Subtask } from '../types';
@@ -35,6 +36,7 @@ export default function DetailScreen() {
   const [allStepsDone,        setAllStepsDone]        = useState(false);
   const [subtaskAnimKey,      setSubtaskAnimKey]       = useState<Record<string, number>>({});
   const [generatingSteps,     setGeneratingSteps]     = useState(false);
+  const [showAdvocacy,        setShowAdvocacy]        = useState(false);
 
   // Tracks which subtask was active when a focus session started,
   // so the post-focus panel knows what to mark done.
@@ -227,6 +229,15 @@ export default function DetailScreen() {
           animation-delay: 0.18s;
         }
       `}</style>
+      {showAdvocacy && (
+        <AdvocacySheet
+          assignmentName={a.name}
+          className={a.className}
+          dueDate={a.dueDate}
+          daysUntil={days}
+          onClose={() => setShowAdvocacy(false)}
+        />
+      )}
       {focusing && (
         <FocusTimer
           assignmentName={a.name}
@@ -259,7 +270,7 @@ export default function DetailScreen() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <button
               onClick={() => navigate('today')}
-              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+              aria-label="Go back" style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
             >
               <IconArrowLeft size={17} color="rgba(255,255,255,0.8)" />
             </button>
@@ -663,6 +674,20 @@ export default function DetailScreen() {
                 </span>
               </button>
             )}
+            {/* Talk to teacher — advocacy button */}
+            <button
+              onClick={() => setShowAdvocacy(true)}
+              aria-label="Get help talking to your teacher"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, border: `1.5px solid #E3EBEA`, background: '#fff', color: Colors.textSecondary, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={days < 0 ? Colors.red : Colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span style={{ color: days < 0 ? Colors.red : Colors.textSecondary }}>
+                {days < 0 ? 'Get help — this is overdue' : 'Talk to your teacher'}
+              </span>
+            </button>
+
             {/* Mark as done — green */}
             <button
               onClick={handleToggleDone}

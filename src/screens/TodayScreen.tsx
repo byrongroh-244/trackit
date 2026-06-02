@@ -240,7 +240,7 @@ export default function TodayScreen() {
                   }}
                 >
                   <span style={{
-                    fontSize: 9,
+                    fontSize: 11,
                     fontWeight: 700,
                     color: day.isToday ? '#B8E04A' : 'rgba(255,255,255,0.45)',
                     textTransform: 'uppercase',

@@ -13,6 +13,9 @@ const base = (size: number, sw: number) => ({
   display: 'inline-block', flexShrink: 0, verticalAlign: 'middle',
   strokeWidth: sw, stroke: 'currentColor', fill: 'none',
   strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+  // ADA: icons are decorative — parent element carries the accessible label
+  'aria-hidden': true as const,
+  focusable: 'false' as const,
 });
 
 // ── Navigation & UI chrome ────────────────────────────────────────────────────

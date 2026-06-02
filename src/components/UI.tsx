@@ -129,6 +129,9 @@ export function ConfirmSheet({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
@@ -191,7 +194,7 @@ export function Screen({ children, style }: { children: ReactNode; style?: CSSPr
 
 export function ScrollBody({ children, style, hasNav = false }: { children: ReactNode; style?: CSSProperties; hasNav?: boolean }) {
   return (
-    <div style={{
+    <div role="main" style={{
       flex: 1,
       overflowY: 'auto',
       overflowX: 'hidden',
@@ -283,6 +286,8 @@ export function CheckCircle({
   return (
     <button
       onClick={e => { e.stopPropagation(); e.preventDefault(); onToggle(); }}
+      aria-label={checked ? 'Mark as incomplete' : 'Mark as complete'}
+      aria-pressed={checked}
       style={{
         width: 44, height: 44,
         background: 'none', border: 'none', padding: 0,
@@ -480,7 +485,7 @@ export function BottomNav({ current, onNavigate, items }: {
   }
 
   return (
-    <nav style={{
+    <nav role="navigation" aria-label="Main navigation" style={{
       position: 'fixed',
       bottom: 0, left: 0, right: 0,
       display: 'flex', alignItems: 'center',

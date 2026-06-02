@@ -137,12 +137,14 @@ export default function AuthScreen({ onAuth }: { onAuth: () => void }) {
 
           {/* Message banner */}
           {message && (
-            <div style={{
-              padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.5,
-              background: status === 'error' ? Colors.redLight : '#D9F5E5',
-              color: status === 'error' ? Colors.red : '#145C38',
-              border: `1px solid ${status === 'error' ? Colors.red + '30' : '#1E8A5530'}`,
-            }}>
+            <div
+              role="alert"
+              style={{
+                padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.5,
+                background: status === 'error' ? Colors.redLight : '#D9F5E5',
+                color: status === 'error' ? Colors.red : '#145C38',
+                border: `1px solid ${status === 'error' ? Colors.red + '30' : '#1E8A5530'}`,
+              }}>
               {message}
             </div>
           )}

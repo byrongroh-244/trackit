@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Assignment } from '../types';
+import AdvocacySheet from './AdvocacySheet';
 import { daysUntil } from '../data/store';
 import { Colors, getUrgencyConfig, getSubjectIconPaths } from '../theme';
 import { UrgencyPill } from './UI';
@@ -27,8 +28,9 @@ function SubjectIcon({ className, bg, stroke }: { className: string; bg: string;
 export default function AssignmentCard({
   assignment: a, onPress, onToggleDone, completing = false, onAnimationEnd,
 }: Props) {
-  const [hovered,   setHovered]   = useState(false);
-  const [checkPop,  setCheckPop]  = useState(false);
+  const [hovered,     setHovered]     = useState(false);
+  const [checkPop,    setCheckPop]    = useState(false);
+  const [showAdvocacy, setShowAdvocacy] = useState(false);
   const days      = daysUntil(a.dueDate);
   const u         = getUrgencyConfig(days);
   const completed = (a.subtasks ?? []).filter(s => s.done).length;
@@ -38,6 +40,15 @@ export default function AssignmentCard({
 
   return (
     <>
+      {showAdvocacy && (
+        <AdvocacySheet
+          assignmentName={a.name}
+          className={a.className}
+          dueDate={a.dueDate}
+          daysUntil={days}
+          onClose={() => setShowAdvocacy(false)}
+        />
+      )}
       <style>{`
         @keyframes card-complete {
           0%   { transform: translateY(0)   scale(1);    opacity: 1; max-height: 90px; }
@@ -89,6 +100,7 @@ export default function AssignmentCard({
         onClick={completing ? undefined : onPress}
         onMouseEnter={() => { if (!completing) setHovered(true); }}
         onMouseLeave={() => { if (!completing) setHovered(false); }}
+        aria-label={`View details for ${a.name}`}
         style={{
           flex: 1, minWidth: 0,
           display: 'flex', alignItems: 'center', gap: 12,
@@ -134,8 +146,22 @@ export default function AssignmentCard({
         </div>
       </button>
 
+      {/* Advocacy flag — overdue only */}
+      {days < 0 && !a.done && (
+        <button
+          onClick={() => setShowAdvocacy(true)}
+          aria-label="Get help talking to your teacher"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '13px 0 13px 0', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+        >
+          <div style={{ width: 26, height: 26, borderRadius: 8, background: Colors.redLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={Colors.red} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+        </button>
+      )}
+
       {/* ── Right — urgency pill + check button ── */}
-      {/* Separate button — completely independent tap target, no stopPropagation needed */}
       <button
         onClick={() => {
           if (!a.done) {
@@ -144,6 +170,8 @@ export default function AssignmentCard({
           }
           onToggleDone();
         }}
+        aria-label={a.done ? `Mark ${a.name} as incomplete` : `Mark ${a.name} as complete`}
+        aria-pressed={a.done}
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 7, padding: '13px 14px',

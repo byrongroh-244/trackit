@@ -504,7 +504,7 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
                 transition: 'border-color 0.15s, background 0.15s',
               }}
             >
-              <div style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: isSelected ? 'rgba(255,255,255,0.6)' : isToday ? Colors.forest : Colors.textHint }}>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: isSelected ? 'rgba(255,255,255,0.6)' : isToday ? Colors.forest : Colors.textHint }}>
                 {DAYS[d.getDay()]}
               </div>
               <div style={{ fontSize: 17, fontWeight: isToday || isSelected ? 700 : 500, color: isSelected ? '#fff' : isToday ? Colors.forest : Colors.textPrimary, lineHeight: 1.1 }}>
@@ -523,7 +523,7 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
                     const urgColor = isSelected ? 'rgba(255,255,255,0.85)' : getUrgencyConfig(daysUntil(key)).accent;
                     return (
                       <div key={idx} style={{
-                        width: '90%', fontSize: 9, fontWeight: 600,
+                        width: '90%', fontSize: 11, fontWeight: 600,
                         color: isSelected ? 'rgba(255,255,255,0.85)' : Colors.textPrimary,
                         background: isSelected ? 'rgba(255,255,255,0.12)' : `${getUrgencyConfig(daysUntil(key)).bg}`,
                         borderRadius: 4, padding: '2px 3px',
