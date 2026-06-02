@@ -426,17 +426,17 @@ export default function TodayScreen() {
                   <button
                     onClick={goToLookaheadSettings}
                     style={{
-                      background: Colors.purpleLight,
-                      border: `0.5px solid ${Colors.purple}33`,
+                      background: '#E8F4F5',
+                      border: `1.5px solid ${Colors.forest}30`,
                       borderRadius: 20, padding: '5px 12px',
                       display: 'flex', alignItems: 'center', gap: 5,
                       cursor: 'pointer', fontFamily: 'inherit',
                     }}
                   >
-                    <span style={{ fontSize: 12, color: Colors.purple, fontWeight: 500 }}>
+                    <span style={{ fontSize: 12, color: Colors.forest, fontWeight: 700 }}>
                       +{hiddenCount} later
                     </span>
-                    <span style={{ fontSize: 11, color: Colors.purple, opacity: 0.6 }}>
+                    <span style={{ fontSize: 11, color: Colors.forest, opacity: 0.6 }}>
                       · {lookaheadLabel()} view
                     </span>
                   </button>

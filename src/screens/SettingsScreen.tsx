@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../hooks/useApp';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../theme';
+import PeriodEditor from '../components/PeriodEditor';
 import { Screen, ScrollBody, ConfirmSheet } from '../components/UI';
 import { IconChevronDown, IconChevronUp, IconChevronRight, IconArrowLeft } from '../components/Icons';
 
@@ -15,7 +16,8 @@ const LOOKAHEAD_OPTIONS = [
 
 const WORK_OPTIONS  = [5, 10, 15, 20, 25, 30];
 const BREAK_OPTIONS = [2, 3, 5, 7, 10];
-const HIGHLIGHT_KEY = 'trackit_highlight_lookahead';
+const HIGHLIGHT_KEY          = 'trackit_highlight_lookahead';
+const HIGHLIGHT_SCHEDULE_KEY = 'trackit_highlight_schedule';
 
 // ── Inline icons ──────────────────────────────────────────────────────────────
 const KeyIcon = () => (
@@ -57,9 +59,9 @@ const EyeIcon = ({ open }: { open: boolean }) => (
 );
 
 // ── Card wrapper ──────────────────────────────────────────────────────────────
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: '#fff', border: '1.5px solid #E3EBEA', borderRadius: 18, margin: '0 16px', overflow: 'hidden' }}>
+    <div style={{ background: '#fff', border: '1.5px solid #E3EBEA', borderRadius: 18, margin: '0 16px', overflow: 'hidden', ...style }}>
       {children}
     </div>
   );
@@ -150,8 +152,50 @@ function SettingsSectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function SettingsScreen() {
-  const { navigate, reset, settings, updateSettings, signOut, userEmail } = useApp();
-  const [highlight,     setHighlight]     = useState(false);
+  const { navigate, reset, settings, updateSettings, signOut, userEmail, courses } = useApp();
+
+  // ── Class schedule ──────────────────────────────────────────────────────────
+  const SCHEDULE_KEY  = 'trackit_class_schedule';
+  const SCHED_TYPE_KEY = 'trackit_schedule_type';
+
+  function loadSchedule(): import('../screens/CalendarScreen').ClassPeriod[] {
+    try { return JSON.parse(localStorage.getItem(SCHEDULE_KEY) ?? '[]'); } catch { return []; }
+  }
+  function saveSchedule(s: import('../screens/CalendarScreen').ClassPeriod[]) {
+    try { localStorage.setItem(SCHEDULE_KEY, JSON.stringify(s)); } catch {}
+  }
+  function loadSchedType(): 'standard' | 'block' {
+    try { return (localStorage.getItem(SCHED_TYPE_KEY) as any) ?? 'standard'; } catch { return 'standard'; }
+  }
+
+  const [scheduleType,  setSchedType]     = useState<'standard' | 'block'>(loadSchedType);
+  const [schedule,      setSchedule]      = useState(loadSchedule);
+  const [editingPeriod, setEditingPeriod] = useState<import('../screens/CalendarScreen').ClassPeriod | null>(null);
+  const [addingPeriod,  setAddingPeriod]  = useState(false);
+
+  const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const DAY_FULL  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  function fmtTime(h: number, m: number) {
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const hh = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${hh}:${String(m).padStart(2, '0')}${ampm}`;
+  }
+
+  function deletePeriod(idx: number) {
+    const updated = schedule.filter((_, i) => i !== idx);
+    setSchedule(updated); saveSchedule(updated);
+  }
+
+  function savePeriod(p: import('../screens/CalendarScreen').ClassPeriod) {
+    const updated = editingPeriod
+      ? schedule.map(s => s === editingPeriod ? p : s)
+      : [...schedule, p];
+    setSchedule(updated); saveSchedule(updated);
+    setEditingPeriod(null); setAddingPeriod(false);
+  }
+  const [highlight,         setHighlight]         = useState(false);
+  const [highlightSchedule, setHighlightSchedule] = useState(false);
   const [showChangePw,  setShowChangePw]  = useState(false);
   const [newPassword,   setNewPassword]   = useState('');
   const [confirmPw,     setConfirmPw]     = useState('');
@@ -172,6 +216,12 @@ export default function SettingsScreen() {
         setHighlight(true);
         localStorage.removeItem(HIGHLIGHT_KEY);
         setTimeout(() => setHighlight(false), 3000);
+      }
+      const schedFlag = localStorage.getItem(HIGHLIGHT_SCHEDULE_KEY);
+      if (schedFlag === '1') {
+        setHighlightSchedule(true);
+        localStorage.removeItem(HIGHLIGHT_SCHEDULE_KEY);
+        setTimeout(() => setHighlightSchedule(false), 3000);
       }
     } catch {}
   }, []);
@@ -367,6 +417,71 @@ export default function SettingsScreen() {
           </Card>
 
           {/* ── Integrations ── */}
+          {/* ── Class schedule ── */}
+          <div id="class-schedule-section" style={{ scrollMarginTop: 80 }} />
+          <SettingsSectionLabel>
+            <span style={{ color: highlightSchedule ? Colors.forest : Colors.textPrimary, fontWeight: highlightSchedule ? 700 : 600, transition: 'color 0.3s, font-weight 0.3s' }}>Class schedule</span>
+          </SettingsSectionLabel>
+          <Card style={{ border: highlightSchedule ? `1.5px solid ${Colors.forest}` : '1.5px solid #E3EBEA', background: highlightSchedule ? forestLight : '#fff', transition: 'border-color 0.4s, background 0.4s' }}>
+            {/* Schedule type toggle */}
+            <div style={{ padding: '12px 16px', borderBottom: '0.5px solid #E3EBEA' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Schedule type</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['standard', 'block'] as const).map(type => (
+                  <button key={type} onClick={() => { setSchedType(type); try { localStorage.setItem(SCHED_TYPE_KEY, type); } catch {} }}
+                    style={{ flex: 1, padding: '9px', borderRadius: 10, border: `1.5px solid ${scheduleType === type ? Colors.forest : '#E3EBEA'}`, background: scheduleType === type ? Colors.forest : '#fff', color: scheduleType === type ? '#fff' : Colors.textSecondary, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+                    {type === 'standard' ? 'Standard' : 'Block (A/B)'}
+                  </button>
+                ))}
+              </div>
+              {scheduleType === 'block' && (
+                <div style={{ fontSize: 11, color: Colors.textHint, marginTop: 7, lineHeight: 1.6 }}>
+                  Block schedules rotate A and B days. Mark specific calendar days as A, B, or off from the Day view in Calendar.
+                </div>
+              )}
+            </div>
+            {schedule.length === 0 && (
+              <div style={{ padding: '12px 16px 10px', fontSize: 13, color: Colors.textHint, lineHeight: 1.5 }}>
+                Add your class times to unlock the Day view in Calendar — see free windows, next class countdowns, and study suggestions.
+              </div>
+            )}
+            {schedule.map((p, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', borderBottom: '0.5px solid #E3EBEA' }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: Colors.textHint, marginTop: 1 }}>
+                    {p.days.map(d => DAY_FULL[d]).join(', ')} · {fmtTime(p.startHour, p.startMin)}–{fmtTime(p.endHour, p.endMin)}{p.room ? ` · ${p.room}` : ''}
+                  </div>
+                </div>
+                <button onClick={() => { setEditingPeriod(p); setAddingPeriod(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: Colors.textHint }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button onClick={() => deletePeriod(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: Colors.red }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => { setEditingPeriod(null); setAddingPeriod(true); }}
+              style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: Colors.forest, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add a class period
+            </button>
+          </Card>
+
+          {/* Period editor sheet */}
+          {addingPeriod && (
+            <PeriodEditor
+              initial={editingPeriod}
+              courses={courses}
+              scheduleType={scheduleType}
+              onSave={savePeriod}
+              onCancel={() => { setAddingPeriod(false); setEditingPeriod(null); }}
+            />
+          )}
+
           <SettingsSectionLabel>Integrations</SettingsSectionLabel>
           <Card>
             <IconRow
