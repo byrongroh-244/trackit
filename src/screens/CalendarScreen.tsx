@@ -426,72 +426,14 @@ function MonthView({ year, month, byDate, allAssignments, selectedKey, onSelectD
         })}
       </div>
 
-      {/* Week combined list — all 7 days in order */}
-      <div style={{ margin: '8px 14px 4px', display: 'flex', flexDirection: 'column', gap: 0, background: '#fff', borderRadius: 18, border: '1.5px solid #E3EBEA', overflow: 'hidden' }}>
-        {(() => {
-          const rows: React.ReactNode[] = [];
-          let hasAny = false;
-          days.forEach((d, di) => {
-            const key      = toKey(d.getFullYear(), d.getMonth(), d.getDate());
-            const active   = (byDate[key] ?? []).filter(a => !a.done);
-            const isToday  = d.getFullYear() === t.y && d.getMonth() === t.m && d.getDate() === t.d;
-            const dayLabel = `${DAYS[d.getDay()]}, ${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
-            const dayDays  = daysUntil(key);
-
-            if (active.length === 0) return;
-            hasAny = true;
-
-            rows.push(
-              <div key={key}>
-                {/* Day header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 6px', borderTop: di > 0 ? '0.5px solid #E3EBEA' : 'none', background: isToday ? '#E8F4F5' : 'transparent' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: isToday ? Colors.forest : Colors.textPrimary, letterSpacing: '-0.01em' }}>
-                    {isToday ? 'Today' : dayLabel}
-                  </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: getUrgencyConfig(dayDays).text, background: getUrgencyConfig(dayDays).bg, padding: '2px 8px', borderRadius: 999 }}>
-                    {active.length} due
-                  </span>
-                </div>
-
-                {/* Assignment rows */}
-                {active.map((a, ai) => {
-                  const u = getUrgencyConfig(daysUntil(a.dueDate));
-                  const isSelected = selectedKey === key;
-                  return (
-                    <div key={a.id}
-                      onClick={() => { onSelectDay(key); onNavigate('detail', a.id); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderTop: '0.5px solid #E3EBEA', cursor: 'pointer', transition: 'background 0.1s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#F5F7F6')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: a.classColor, flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</div>
-                        <div style={{ fontSize: 12, color: Colors.textHint, marginTop: 1 }}>{a.className}</div>
-                      </div>
-                      {isTestOrQuiz(a.type) && (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: u.text, background: u.bg, padding: '2px 7px', borderRadius: 999 }}>
-                          {a.type}
-                        </span>
-                      )}
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={Colors.textHint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9,18 15,12 9,6"/></svg>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          });
-
-          if (!hasAny) {
-            return (
-              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: Colors.textHint }}>
-                Nothing due this week
-              </div>
-            );
-          }
-          return rows;
-        })()}
-      </div>
+      {selectedKey && (
+        <DayPanel
+          dateKey={selectedKey}
+          items={selectedItems}
+          allAssignments={allAssignments}
+          onNavigate={onNavigate}
+        />
+      )}
 
       <UpcomingTestsBanner byDate={byDate} onNavigate={onNavigate} />
     </div>
@@ -499,7 +441,7 @@ function MonthView({ year, month, byDate, allAssignments, selectedKey, onSelectD
 }
 
 // ── Week view ─────────────────────────────────────────────────────────────────
-function WeekView({ weekStart, allAssignments, onNavigate }: {
+function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay, onNavigate }: {
   weekStart: Date;
   byDate: Record<string, Assignment[]>;
   allAssignments: Assignment[];
@@ -508,181 +450,139 @@ function WeekView({ weekStart, allAssignments, onNavigate }: {
   onNavigate: (screen: any, id?: string) => void;
 }) {
   const t = today();
-
-  // Load schedule + overrides
-  let schedule: ClassPeriod[] = [];
-  let scheduleType: 'standard' | 'block' = 'standard';
-  let dayOverrides: Record<string, 'A' | 'B' | 'off'> = {};
-  try {
-    const raw = localStorage.getItem('trackit_class_schedule');
-    if (raw) schedule = JSON.parse(raw);
-    scheduleType = (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard';
-    const ov = localStorage.getItem('trackit_day_overrides');
-    if (ov) dayOverrides = JSON.parse(ov);
-  } catch {}
-
-  // Build 5 weekdays Mon–Fri
-  const weekDays = Array.from({ length: 5 }, (_, i) => {
+  const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);
     d.setDate(weekStart.getDate() + i);
     return d;
   });
 
-  const START_HOUR = 7;
-  const END_HOUR   = 18;
-  const HOUR_PX    = 52;
-  const COL_W      = 56; // px per day column
-
-  function toY(h: number, m: number) { return ((h - START_HOUR) + m / 60) * HOUR_PX; }
-  function toBlockH(sh: number, sm: number, eh: number, em: number) {
-    return Math.max(((eh - sh) + (em - sm) / 60) * HOUR_PX - 2, 16);
+  const stepDates = new Set<string>();
+  for (const a of allAssignments) {
+    for (const s of a.subtasks ?? []) {
+      if (s.dueDate && !s.done) stepDates.add(s.dueDate);
+    }
   }
 
-  const totalH = (END_HOUR - START_HOUR) * HOUR_PX;
-  const hours  = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
-
-  function getPeriodsForDay(d: Date): ClassPeriod[] {
-    const dow = d.getDay();
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const override = dayOverrides[key] as 'A' | 'B' | 'off' | undefined;
-    if (override === 'off') return [];
-    return schedule.filter(p => {
-      if (!p.days.includes(dow)) return false;
-      if (scheduleType !== 'block' || !p.blockDay) return true;
-      if (override === 'A' || override === 'B') return p.blockDay === override;
-      return true;
-    });
-  }
-
-  const now = new Date();
-  const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const nowY = toY(now.getHours(), now.getMinutes());
+  const selectedItems = selectedKey ? (byDate[selectedKey] ?? []) : [];
 
   return (
     <div>
-      {/* Horizontally scrollable grid */}
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any, paddingBottom: 8 }}>
-        <div style={{ minWidth: 36 + COL_W * 5 + 16, padding: '8px 8px 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, padding: '8px 10px' }}>
+        {days.map(d => {
+          const key     = toKey(d.getFullYear(), d.getMonth(), d.getDate());
+          const items   = byDate[key] ?? [];
+          const active  = items.filter(a => !a.done);
+          const isToday = d.getFullYear() === t.y && d.getMonth() === t.m && d.getDate() === t.d;
+          const isSelected = key === selectedKey;
+          const hasStep = stepDates.has(key) && active.length === 0;
+          const tappable = items.length > 0 || stepDates.has(key);
+          const sorted  = sortedMarkers(active);
 
-          {/* Day header row */}
-          <div style={{ display: 'flex', marginLeft: 36, marginBottom: 6, gap: 2 }}>
-            {weekDays.map(d => {
-              const key     = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-              const isToday = d.getFullYear() === t.y && d.getMonth() === t.m && d.getDate() === t.d;
-              const override = dayOverrides[key] as 'A' | 'B' | 'off' | undefined;
-              return (
-                <div key={key} style={{ width: COL_W, textAlign: 'center', flexShrink: 0 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: isToday ? Colors.forest : Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {['Mon','Tue','Wed','Thu','Fri'][d.getDay() - 1]}
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: isToday ? 800 : 500, color: isToday ? Colors.forest : Colors.textPrimary, lineHeight: 1.2 }}>
-                    {d.getDate()}
-                  </div>
-                  {isToday && <div style={{ width: 16, height: 2, borderRadius: 1, background: '#B8E04A', margin: '2px auto 0' }} />}
-                  {override && override !== 'off' && (
-                    <div style={{ fontSize: 9, fontWeight: 700, color: Colors.forest, marginTop: 1 }}>{override}-day</div>
-                  )}
-                  {override === 'off' && (
-                    <div style={{ fontSize: 9, fontWeight: 700, color: Colors.textHint, marginTop: 1 }}>off</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          // Show up to 2 names inline if only 1-2 items; dots for 3+
+          const showNames = active.length > 0 && active.length <= 2;
 
-          {/* Time axis + columns */}
-          <div style={{ display: 'flex', position: 'relative' }}>
+          return (
+            <div
+              key={key}
+              onClick={() => tappable ? onSelectDay(key) : undefined}
+              style={{
+                minHeight: 86,
+                borderRadius: 12,
+                padding: '7px 5px 6px',
+                background: isSelected
+                  ? Colors.forest
+                  : isToday
+                  ? '#E8F4F5'
+                  : '#fff',
+                border: isToday && !isSelected
+                  ? `1.5px solid ${Colors.forest}`
+                  : isSelected
+                  ? 'none'
+                  : '1.5px solid #E3EBEA',
+                cursor: tappable ? 'pointer' : 'default',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                transition: 'border-color 0.15s, background 0.15s',
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: isSelected ? 'rgba(255,255,255,0.6)' : isToday ? Colors.forest : Colors.textHint }}>
+                {DAYS[d.getDay()]}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: isToday || isSelected ? 700 : 500, color: isSelected ? '#fff' : isToday ? Colors.forest : Colors.textPrimary, lineHeight: 1.1 }}>
+                {d.getDate()}
+              </div>
 
-            {/* Hour labels */}
-            <div style={{ width: 36, flexShrink: 0, position: 'relative', height: totalH }}>
-              {hours.map(h => (
-                <div key={h} style={{ position: 'absolute', top: (h - START_HOUR) * HOUR_PX - 6, right: 6, fontSize: 9, fontWeight: 500, color: Colors.textHint, lineHeight: 1, whiteSpace: 'nowrap' }}>
-                  {h === 12 ? '12p' : h > 12 ? `${h-12}p` : `${h}a`}
-                </div>
-              ))}
-            </div>
+              {/* Lime pip under today */}
+              {isToday && !isSelected && (
+                <div style={{ width: 16, height: 2.5, borderRadius: 2, background: '#B8E04A' }} />
+              )}
 
-            {/* Day columns */}
-            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-              {weekDays.map(d => {
-                const key      = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                const isToday  = key === todayKey;
-                const periods  = getPeriodsForDay(d);
-                const asgns    = allAssignments.filter(a => a.dueDate === key && !a.done);
-
-                return (
-                  <div key={key} style={{ width: COL_W, flexShrink: 0, position: 'relative', height: totalH, background: isToday ? '#E8F4F520' : 'transparent', borderRadius: 6, borderLeft: `0.5px solid ${isToday ? Colors.forest + '30' : '#E3EBEA'}` }}>
-
-                    {/* Hour grid lines */}
-                    {hours.map(h => (
-                      <div key={h} style={{ position: 'absolute', top: (h - START_HOUR) * HOUR_PX, left: 0, right: 0, borderTop: '0.5px solid #E3EBEA', opacity: 0.5 }} />
-                    ))}
-
-                    {/* Current time line */}
-                    {isToday && nowY >= 0 && nowY <= totalH && (
-                      <div style={{ position: 'absolute', top: nowY, left: 0, right: 0, borderTop: '1.5px solid #B8E04A', zIndex: 4 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#B8E04A', marginTop: -3, marginLeft: -3 }} />
-                      </div>
-                    )}
-
-                    {/* Class period blocks */}
-                    {periods.map((p, pi) => (
-                      <div key={pi} style={{
-                        position: 'absolute',
-                        top: toY(p.startHour, p.startMin) + 1,
-                        left: 2, right: 2,
-                        height: toBlockH(p.startHour, p.startMin, p.endHour, p.endMin),
-                        background: `${p.color}25`,
-                        borderLeft: `2.5px solid ${p.color}`,
-                        borderRadius: '0 4px 4px 0',
-                        overflow: 'hidden',
-                        zIndex: 2,
-                        padding: '2px 3px',
+              {/* Content: names if 1-2, dots if 3+ */}
+              {showNames ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%', marginTop: 1 }}>
+                  {active.slice(0, 2).map((a, idx) => {
+                    const urgColor = isSelected ? 'rgba(255,255,255,0.85)' : getUrgencyConfig(daysUntil(key)).accent;
+                    return (
+                      <div key={idx} style={{
+                        width: '90%', fontSize: 11, fontWeight: 600,
+                        color: isSelected ? 'rgba(255,255,255,0.85)' : Colors.textPrimary,
+                        background: isSelected ? 'rgba(255,255,255,0.12)' : `${getUrgencyConfig(daysUntil(key)).bg}`,
+                        borderRadius: 4, padding: '2px 3px',
+                        textAlign: 'center',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        display: 'flex', alignItems: 'center', gap: 2,
                       }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: p.color, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {p.name}
-                        </div>
+                        {isTestOrQuiz(a.type) && (
+                          <svg width="5" height="5" viewBox="0 0 8 8" style={{ flexShrink: 0 }}>
+                            <rect x="1" y="1" width="6" height="6" rx="1" transform="rotate(45 4 4)" fill={urgColor} />
+                          </svg>
+                        )}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {a.name.split(' ').slice(0, 2).join(' ')}
+                        </span>
                       </div>
-                    ))}
-
-                    {/* Assignment dots — placed at due time or bottom of day */}
-                    {asgns.map((a, ai) => {
-                      const u = getUrgencyConfig(daysUntil(key));
-                      // Find the class period for this assignment to anchor it
-                      const period = periods.find(p => p.name === a.className);
-                      const dotY   = period ? toY(period.startHour, period.startMin) - 8 : totalH - 20 - ai * 14;
-                      return (
-                        <div key={a.id}
-                          onClick={() => onNavigate('detail', a.id)}
-                          style={{
-                            position: 'absolute',
-                            top: Math.max(4, Math.min(totalH - 12, dotY)),
-                            left: 3, right: 3,
-                            height: 12,
-                            background: u.bg,
-                            borderRadius: 3,
-                            zIndex: 3,
-                            cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', overflow: 'hidden',
-                            padding: '0 3px',
-                          }}
-                        >
-                          <div style={{ width: 4, height: 4, borderRadius: '50%', background: u.accent, flexShrink: 0 }} />
-                          <div style={{ fontSize: 8, fontWeight: 700, color: u.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 2 }}>
-                            {a.name.split(' ')[0]}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ) : active.length >= 3 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 2, marginTop: 2 }}>
+                  {sorted.slice(0, 4).map((a, idx) => (
+                    isTestOrQuiz(a.type) ? (
+                      <svg key={idx} width="7" height="7" viewBox="0 0 8 8">
+                        <rect x="1" y="1" width="6" height="6" rx="1" transform="rotate(45 4 4)"
+                          fill={isSelected ? '#fff' : getUrgencyConfig(daysUntil(key)).accent} />
+                      </svg>
+                    ) : (
+                      <span key={idx} style={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        background: isSelected ? 'rgba(255,255,255,0.7)' : getUrgencyConfig(daysUntil(key)).accent,
+                        display: 'inline-block',
+                      }} />
+                    )
+                  ))}
+                  {active.length > 4 && (
+                    <span style={{ fontSize: 8, color: isSelected ? 'rgba(255,255,255,0.6)' : Colors.textHint, lineHeight: 1.8 }}>
+                      +{active.length - 4}
+                    </span>
+                  )}
+                </div>
+              ) : hasStep ? (
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: isSelected ? 'rgba(255,255,255,0.5)' : Colors.textHint, display: 'inline-block', marginTop: 2 }} />
+              ) : null}
             </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      <UpcomingTestsBanner byDate={assignmentsByDate(allAssignments)} onNavigate={onNavigate} />
+      {selectedKey && (
+        <DayPanel
+          dateKey={selectedKey}
+          items={selectedItems}
+          allAssignments={allAssignments}
+          onNavigate={onNavigate}
+        />
+      )}
+
+      <UpcomingTestsBanner byDate={byDate} onNavigate={onNavigate} />
     </div>
   );
 }
