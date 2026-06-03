@@ -1,13 +1,12 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { supabase } from './lib/supabase';
+import { lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './hooks/useApp';
 import TrackItLogo from './components/TrackItLogo';
 
 // ── Eager — shown immediately on load ────────────────────────────────────────
-import AuthScreen      from './screens/AuthScreen';
+import AuthScreen       from './screens/AuthScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
-import TodayScreen     from './screens/TodayScreen';
-import TermsScreen     from './screens/TermsScreen';
+import TodayScreen      from './screens/TodayScreen';
+import TermsScreen      from './screens/TermsScreen';
 
 // ── Lazy — split into separate chunks, loaded on first visit ─────────────────
 const AddScreen      = lazy(() => import('./screens/AddScreen'));
@@ -31,23 +30,10 @@ function ScreenFallback() {
 }
 
 function Router() {
-  const { screen, settings, navigate, updateSettings } = useApp();
-  const [authed, setAuthed] = useState<boolean | null>(null);
+  const { screen, settings, navigate, updateSettings, authed, loading } = useApp();
 
-  useEffect(() => {
-    const timeout = setTimeout(() => setAuthed(false), 4000);
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timeout);
-      setAuthed(!!session);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setAuthed(!!session);
-    });
-    return () => { clearTimeout(timeout); subscription.unsubscribe(); };
-  }, []);
-
-  // Loading
-  if (authed === null) {
+  // Auth not yet resolved — show splash
+  if (authed === null || (authed && loading)) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1c4a4f' }}>
         <TrackItLogo size={64} />
@@ -56,9 +42,9 @@ function Router() {
   }
 
   // Not logged in
-  if (!authed) return <AuthScreen onAuth={() => setAuthed(true)} />;
+  if (!authed) return <AuthScreen onAuth={() => {/* handled by onAuthStateChange in useApp */}} />;
 
-  // Needs terms acceptance — shown to all users who haven't accepted yet
+  // Needs terms acceptance
   if (!settings.termsAccepted) {
     return (
       <TermsScreen

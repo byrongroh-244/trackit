@@ -2,9 +2,12 @@ import { useRef, useState } from 'react';
 import { Colors } from '../../theme';
 import { IconLoader, IconStop, IconArrowLeft } from '../Icons';
 import type { AssignmentType, Course } from '../../types';
+import { SUPABASE_ANON_KEY, AI_FUNCTION_URL as SUPABASE_FUNCTION_URL, supabase as supabaseClient } from '../../lib/supabase';
 
-const SUPABASE_FUNCTION_URL = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/parse-assignment';
-const SUPABASE_ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
+async function getSessionToken(): Promise<string> {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return session?.access_token ?? SUPABASE_ANON_KEY;
+}
 
 const TYPE_OPTIONS: AssignmentType[] = ['homework', 'test', 'quiz', 'project', 'other'];
 
@@ -98,9 +101,10 @@ export default function VoiceInput({ courses, onDone, onCancel }: Props) {
         reader.readAsDataURL(blob);
       });
       const today    = new Date().toISOString().split('T')[0];
+      const sessionToken = await getSessionToken();
       const response = await fetch(SUPABASE_FUNCTION_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
         body: JSON.stringify({ mode: 'audio', data: base64, mimeType: 'audio/webm', today }),
       });
       if (!response.ok) throw new Error(`Server error ${response.status}`);

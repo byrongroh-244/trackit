@@ -6,6 +6,7 @@ import AssignmentCard from '../components/AssignmentCard';
 import { Screen, ScrollBody, BottomNav, SectionLabel, EmptyState, ConfirmSheet } from '../components/UI';
 import { IconClipboard, IconBook, IconCircleCheck, IconChevronDown, IconChevronUp, IconChevronRight, IconCheck, IconArrowLeft } from '../components/Icons';
 import type { Course, Assignment } from '../types';
+import { SUPABASE_ANON_KEY, CANVAS_PROXY_URL, supabase as supabaseClient } from '../lib/supabase';
 
 const NAV = [
   { label: 'Agenda',   icon: '', screen: 'today'    },
@@ -54,13 +55,13 @@ export default function ClassesScreen() {
     setSyncing(true); setSyncMsg('');
     try {
       const clean = canvasDomain.replace(/https?:\/\//, '').replace(/\/$/, '');
-      const PROXY = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/canvas-proxy';
-      const ANON  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const authHeader = session?.access_token ? `Bearer ${session.access_token}` : `Bearer ${SUPABASE_ANON_KEY}`;
 
       async function canvasFetch(path: string) {
-        const res = await fetch(PROXY, {
+        const res = await fetch(CANVAS_PROXY_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON}`, 'apikey': ANON },
+          headers: { 'Content-Type': 'application/json', 'Authorization': authHeader, 'apikey': authHeader.replace('Bearer ', '') },
           body: JSON.stringify({ domain: clean, token: canvasToken, path }),
         });
         if (!res.ok) throw new Error(`Canvas error ${res.status}`);

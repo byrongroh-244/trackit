@@ -3,6 +3,12 @@ import { Colors } from '../../theme';
 import { IconLoader, IconArrowLeft } from '../Icons';
 import type { AssignmentType, Course } from '../../types';
 import type { AppSettings } from '../../data/store';
+import { SUPABASE_ANON_KEY, AI_FUNCTION_URL as SUPABASE_FUNCTION_URL, supabase as supabaseClient } from '../../lib/supabase';
+
+async function getSessionToken(): Promise<string> {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return session?.access_token ?? SUPABASE_ANON_KEY;
+}
 
 // ── Shared sub-page header ────────────────────────────────────────────────────
 function SubHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack: () => void }) {
@@ -24,9 +30,6 @@ function SubHeader({ title, subtitle, onBack }: { title: string; subtitle?: stri
   );
 }
 
-
-const SUPABASE_FUNCTION_URL = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/parse-assignment';
-const SUPABASE_ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
 
 const TYPE_OPTIONS: AssignmentType[] = ['homework', 'test', 'quiz', 'project', 'other'];
 
@@ -75,10 +78,11 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
       const isPdf = file.type === 'application/pdf';
       let parsed: { name: string; dueDate: string; type: AssignmentType }[] = [];
 
+      const sessionToken = await getSessionToken();
       if (isPdf) {
         const edgeRes = await fetch(SUPABASE_FUNCTION_URL, {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
           body: JSON.stringify({ mode: 'pdf', data: base64, today }),
         });
         if (edgeRes.ok) {
@@ -107,31 +111,17 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
   }
 
   async function parseWithClaudeVision(base64: string, mimeType: string, today: string) {
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('No API key configured.');
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const sessionToken = await getSessionToken();
+    const response = await fetch(SUPABASE_FUNCTION_URL, {
       method:  'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: mimeType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
-            { type: 'text', text: `Today is ${today}. Extract all assignments, tests, quizzes, and projects from this syllabus. Return ONLY a JSON array, no other text. Each item: name (string), dueDate (YYYY-MM-DD, skip if no date), type (homework|test|quiz|project|other). Only include items with a due date.` },
-          ],
-        }],
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      body: JSON.stringify({ mode: 'vision', data: base64, mimeType, today }),
     });
-    if (!response.ok) { const err = await response.json(); throw new Error(err.error?.message ?? `API error ${response.status}`); }
-    const data  = await response.json();
-    const text  = data.content.map((b: any) => b.text ?? '').join('');
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error ?? `API error ${response.status}`);
+    }
+    const text  = await response.text();
     const clean = text.replace(/```json|```/g, '').trim();
     return JSON.parse(clean);
   }

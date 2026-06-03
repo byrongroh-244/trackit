@@ -32,7 +32,7 @@ export default function AuthScreen({ onAuth }: { onAuth: () => void }) {
     if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) { setStatus('error'); setMessage(error.message); }
-      else { setStatus('success'); onAuth(); }
+      else { setStatus('success'); /* auth state update handled by onAuthStateChange in useApp */ }
     } else if (mode === 'signup') {
       const { error } = await supabase.auth.signUp({ email: email.trim(), password });
       if (error) { setStatus('error'); setMessage(error.message); }

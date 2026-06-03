@@ -15,6 +15,7 @@ interface AppState {
 }
 
 interface AppCtx extends AppState {
+  authed: boolean | null;
   navigate: (screen: Screen, detailId?: string) => void;
   updateAssignments: (a: Assignment[], changed?: Assignment[]) => Promise<void>;
   upsertAssignments: (added: Assignment[]) => Promise<void>;
@@ -76,6 +77,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading,     setLoading]     = useState(true);
   const [userId,      setUserId]      = useState<string | null>(null);
   const [userEmail,   setUserEmail]   = useState<string | null>(null);
+  const [authed,      setAuthed]      = useState<boolean | null>(null);
 
   // useRef so callbacks always read the latest userId without needing it
   // in their dependency arrays. A plain object literal re-created each render
@@ -123,13 +125,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // 4-second fallback so the splash doesn't hang if Supabase is slow
+    const timeout = setTimeout(() => { setAuthed(false); setLoading(false); }, 4000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { setUserId(session.user.id); setUserEmail(session.user.email ?? null); loadData(session.user.id); }
-      else setLoading(false);
+      clearTimeout(timeout);
+      if (session?.user) {
+        setUserId(session.user.id);
+        setUserEmail(session.user.email ?? null);
+        setAuthed(true);
+        loadData(session.user.id);
+      } else {
+        setAuthed(false);
+        setLoading(false);
+      }
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) { setUserId(session.user.id); setUserEmail(session.user.email ?? null); loadData(session.user.id); }
-      else { setUserId(null); setUserEmail(null); setAssignments([]); setCourses([]); setLoading(false); }
+      if (session?.user) {
+        setUserId(session.user.id);
+        setUserEmail(session.user.email ?? null);
+        setAuthed(true);
+        loadData(session.user.id);
+      } else {
+        setUserId(null);
+        setUserEmail(null);
+        setAuthed(false);
+        setAssignments([]);
+        setCourses([]);
+        setLoading(false);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -169,22 +194,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── upsertAssignments ──────────────────────────────────────────────────────
   // For inserting brand-new records only (syllabus import, voice import, etc.).
-  // Optimistically appends to local state, then inserts only the new rows.
-  // Uses `ignoreDuplicates: true` so a double-submit never throws.
+  // Derives existing ID map from in-memory state — no extra Supabase round-trip.
+  // Re-syncing Canvas: IDs are reused for matching name+dueDate+className combos
+  // so repeated imports update in-place rather than create duplicates.
   const upsertAssignments = useCallback(async (added: Assignment[]) => {
     if (added.length === 0) return;
-
-    setAssignments(prev => {
-      const keyToId = new Map(prev.map(a => [`${a.name}||${a.dueDate}||${a.className}`, a.id]));
-      const merged  = added.map(a => {
-        const key = `${a.name}||${a.dueDate}||${a.className}`;
-        return keyToId.has(key) ? { ...a, id: keyToId.get(key)! } : a;
-      });
-      const existingIds = new Set(prev.map(a => a.id));
-      const fresh = merged.filter(a => !existingIds.has(a.id));
-      // Replace existing records with updated ones, add new ones
-      return [...prev.filter(a => !merged.find(m => m.id === a.id)), ...merged];
-    });
 
     // Wait up to 3s for userId if it hasn't resolved yet (e.g. right after Canvas sync)
     let uid = userIdRef.current;
@@ -197,23 +211,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (!uid) { console.error('upsertAssignments: no userId after wait'); return; }
 
-    // Fetch existing IDs keyed by name+dueDate+className so we can
-    // upsert (update if exists, insert if new) rather than skip duplicates.
-    // This means re-syncing Canvas always reflects the latest Canvas data.
-    const { data: existing } = await supabase
-      .from('assignments')
-      .select('id, name, due_date, class_name')
-      .eq('user_id', uid!);
+    // Build ID map from current in-memory assignments — no DB round-trip needed.
+    // setAssignments is called with a function so we can read the latest snapshot.
+    let existingIdMap: Map<string, string> = new Map();
+    setAssignments(prev => {
+      existingIdMap = new Map(prev.map(a => [`${a.name}||${a.dueDate}||${a.className}`, a.id]));
 
-    const existingIdMap = new Map<string, string>(
-      (existing ?? []).map((r: any) => [`${r.name}||${r.due_date}||${r.class_name}`, r.id])
-    );
+      const merged = added.map(a => {
+        const key = `${a.name}||${a.dueDate}||${a.className}`;
+        return existingIdMap.has(key) ? { ...a, id: existingIdMap.get(key)! } : a;
+      });
+      // Replace existing records with updated ones, add new ones
+      return [...prev.filter(a => !merged.find(m => m.id === a.id)), ...merged];
+    });
 
     // Reuse existing IDs for matching records so upsert works correctly
     const toWrite = added.map(a => {
       const key = `${a.name}||${a.dueDate}||${a.className}`;
-      const existingId = existingIdMap.get(key);
-      return { ...a, id: existingId ?? a.id };
+      return { ...a, id: existingIdMap.get(key) ?? a.id };
     });
 
     // Upsert in batches of 20
@@ -346,7 +361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{
-      assignments, courses, screen, detailId, settings, loading, userId, userEmail,
+      assignments, courses, screen, detailId, settings, loading, userId, userEmail, authed,
       navigate, updateAssignments, upsertAssignments, updateCourses,
       patchAssignment, deleteAssignment, updateSettings, reset, signOut,
     }}>

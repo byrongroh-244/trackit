@@ -1,11 +1,13 @@
 import type { Assignment, AssignmentType, Course, Subtask } from '../types';
 import stepLibrary from './stepLibrary.json';
+import { SUPABASE_ANON_KEY, AI_FUNCTION_URL, CANVAS_PROXY_URL, supabase as supabaseClient } from '../lib/supabase';
+
+async function getSessionToken(): Promise<string> {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return session?.access_token ?? SUPABASE_ANON_KEY;
+}
 
 const SETTINGS_KEY = 'trackit_settings';
-
-// ── AI subtask fallback ───────────────────────────────────────────────────────
-const AI_FUNCTION_URL = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/parse-assignment';
-const AI_ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
 
 export function uid(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -215,9 +217,10 @@ export async function generateSubtasks(name: string, dueDate: string, gradeLevel
     try {
       const controller = new AbortController();
       const timeout    = setTimeout(() => controller.abort(), 5000);
+      const token = await getSessionToken();
       const res = await fetch(AI_FUNCTION_URL, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AI_ANON_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body:    JSON.stringify({ mode: 'subtasks', assignmentName: name, dueDate, gradeLevel }),
         signal:  controller.signal,
       });
@@ -252,16 +255,15 @@ export async function generateSubtasks(name: string, dueDate: string, gradeLevel
 }
 
 // ── Canvas API ─────────────────────────────────────────────────────────────────
-const SUPABASE_CANVAS_PROXY = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/canvas-proxy';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
 
 async function canvasFetch(domain: string, token: string, path: string): Promise<any> {
   const clean = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
-  const res = await fetch(SUPABASE_CANVAS_PROXY, {
+  const sessionToken = await getSessionToken();
+  const res = await fetch(CANVAS_PROXY_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${sessionToken}`,
     },
     body: JSON.stringify({ domain: clean, token, path }),
   });
@@ -313,44 +315,55 @@ export async function importFromCanvas(
     ? allCourses.filter(c => selectedCourseIds.includes(c.id))
     : allCourses;
 
-  const newCourses: Course[]         = [];
-  const newAssignments: Assignment[] = [];
   const usedColors = new Set(existingColors);
 
-  for (let i = 0; i < toImport.length; i++) {
-    const cc    = toImport[i];
+  // Build course metadata first (synchronous — no network needed)
+  const courseList = toImport.map((cc, i) => {
     const color = colorPalette.find(c => !usedColors.has(c)) ?? colorPalette[i % colorPalette.length];
     usedColors.add(color);
-    // Use existing course's display name if already in app (handles renames)
     const existingCourse = existingCourses.find(c => c.canvasId === cc.id);
-    const displayName    = existingCourse?.name ?? cc.name;
+    const displayName    = existingCourse?.name  ?? cc.name;
     const courseColor    = existingCourse?.color ?? color;
     const courseId       = existingCourse?.id    ?? uid();
-    const course: Course = { id: courseId, name: displayName, color: courseColor, canvasName: cc.name, canvasId: cc.id };
-    if (!existingCourse) newCourses.push(course);
-    try {
-      // No bucket filter — gets all assignments including test/sandbox ones
-      // Higher per_page to avoid missing assignments in large courses
-      const asgns = await canvasFetch(clean, token,
-        `courses/${cc.id}/assignments?per_page=50&order_by=due_at`
-      ) as Array<{ name: string; due_at?: string; description?: string; submission_types?: string[] }>;
-      if (!Array.isArray(asgns)) continue;
-      for (const a of asgns) {
-        // Skip assignments with no due date or that are "not_graded" placeholders
-        if (!a.due_at) continue;
-        if (a.submission_types?.includes('not_graded') && a.submission_types.length === 1) continue;
-        const dueDate = a.due_at.split('T')[0];
-        newAssignments.push({
-          id: uid(), name: a.name,
-          classId: course.id, className: course.name, classColor: course.color,
-          dueDate, done: false,
-          notes: (a.description ?? '').replace(/<[^>]*>/g, '').slice(0, 300),
-          type: inferType(a.name),
-          effort: null,
-          subtasks: [],  // generated on first open via DetailScreen fallback
-        });
-      }
-    } catch { /* skip course on error */ }
+    return {
+      course: { id: courseId, name: displayName, color: courseColor, canvasName: cc.name, canvasId: cc.id } as Course,
+      isNew: !existingCourse,
+      cc,
+    };
+  });
+
+  const newCourses: Course[] = courseList.filter(c => c.isNew).map(c => c.course);
+
+  // Fetch all courses' assignments in parallel, capped at 5 concurrent requests
+  const CONCURRENCY = 5;
+  const allAssignments: Assignment[][] = [];
+
+  for (let i = 0; i < courseList.length; i += CONCURRENCY) {
+    const batch = courseList.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async ({ course, cc }) => {
+        try {
+          const asgns = await canvasFetch(clean, token,
+            `courses/${cc.id}/assignments?per_page=50&order_by=due_at`
+          ) as Array<{ name: string; due_at?: string; description?: string; submission_types?: string[] }>;
+          if (!Array.isArray(asgns)) return [];
+          return asgns
+            .filter(a => a.due_at && !(a.submission_types?.includes('not_graded') && a.submission_types.length === 1))
+            .map(a => ({
+              id: uid(), name: a.name,
+              classId: course.id, className: course.name, classColor: course.color,
+              dueDate: a.due_at!.split('T')[0], done: false,
+              notes: (a.description ?? '').replace(/<[^>]*>/g, '').slice(0, 300),
+              type: inferType(a.name),
+              effort: null,
+              subtasks: [],
+            } as Assignment));
+        } catch { return []; }
+      })
+    );
+    allAssignments.push(...results);
   }
+
+  const newAssignments = allAssignments.flat();
   return { courses: newCourses, assignments: newAssignments };
 }

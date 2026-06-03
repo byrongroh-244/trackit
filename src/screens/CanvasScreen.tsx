@@ -5,6 +5,12 @@ import { Colors, CLASS_COLORS } from '../theme';
 import { Screen, ScrollBody, useToast } from '../components/UI';
 import { IconCircleCheck, IconArrowLeft } from '../components/Icons';
 import type { Course, Assignment } from '../types';
+import { supabase, CANVAS_PROXY_URL } from '../lib/supabase';
+
+async function getAuthHeader(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ? `Bearer ${session.access_token}` : '';
+}
 
 const DOMAIN_KEY = 'trackit_canvas_domain';
 const TOKEN_KEY  = 'trackit_canvas_token';
@@ -28,14 +34,12 @@ interface ClassSetup {
   color:    string;
 }
 
-const PROXY = 'https://vnofpgowelblwkonkeab.supabase.co/functions/v1/canvas-proxy';
-const ANON  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2ZwZ293ZWxibHdrb25rZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5MTIzNDEsImV4cCI6MjA5NTQ4ODM0MX0.WPHYoSzUjlXlB8ezsh_IrnFqWt_F33HL36tZgk0vjZc';
-
 async function canvasFetch(domain: string, token: string, path: string) {
   const clean = domain.replace(/https?:\/\//, '').replace(/\/$/, '');
-  const res = await fetch(PROXY, {
+  const authHeader = await getAuthHeader();
+  const res = await fetch(CANVAS_PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON}`, 'apikey': ANON },
+    headers: { 'Content-Type': 'application/json', 'Authorization': authHeader, 'apikey': authHeader.replace('Bearer ', '') },
     body: JSON.stringify({ domain: clean, token, path }),
   });
   if (!res.ok) throw new Error(`Canvas error ${res.status}`);
