@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { AppProvider, useApp } from './hooks/useApp';
 import TrackItLogo from './components/TrackItLogo';
+import { useToast } from './components/UI';
 
 // ── Eager — shown immediately on load ────────────────────────────────────────
 import AuthScreen       from './screens/AuthScreen';
@@ -30,7 +31,15 @@ function ScreenFallback() {
 }
 
 function Router() {
-  const { screen, settings, navigate, updateSettings, authed, loading } = useApp();
+  const { screen, settings, navigate, updateSettings, authed, loading, writeError, clearWriteError } = useApp();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (writeError) {
+      showToast(writeError, 'error');
+      clearWriteError();
+    }
+  }, [writeError]);
 
   // Auth not yet resolved — show splash
   if (authed === null || (authed && loading)) {

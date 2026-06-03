@@ -459,7 +459,7 @@ export interface ClassPeriod {
 // ── Week view ─────────────────────────────────────────────────────────────────
 // Identical visual to DayView — 7 columns side by side, same hour axis,
 // same class blocks, same free windows, same current-time line.
-function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay, onNavigate, dayOverrides, setOverride, hourPx, getDerivedBlockDay }: {
+function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay, onNavigate, dayOverrides, setOverride, hourPx, getDerivedBlockDay, schedule, scheduleType, adjustedDays }: {
   weekStart: Date;
   byDate: Record<string, Assignment[]>;
   allAssignments: Assignment[];
@@ -470,6 +470,9 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
   setOverride: (key: string, val: 'A' | 'B' | 'off' | null) => void;
   hourPx: number;
   getDerivedBlockDay: (key: string) => 'A' | 'B' | null;
+  schedule: ClassPeriod[];
+  scheduleType: 'standard' | 'block';
+  adjustedDays: { label: string }[];
 }) {
   const t   = today();
   const now = new Date();
@@ -493,20 +496,7 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
   });
 
   // Load schedule only — overrides come from props
-  let schedule: ClassPeriod[] = [];
-  let scheduleType: 'standard' | 'block' = 'standard';
-  try {
-    const raw = localStorage.getItem('trackit_class_schedule');
-    if (raw) schedule = JSON.parse(raw);
-    scheduleType = (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard';
-  } catch {}
-
-  // Load adjusted days once for WeekView
-  let wvAdjustedDays: { label: string }[] = [];
-  try {
-    const r = localStorage.getItem('trackit_adjusted_days');
-    if (r) wvAdjustedDays = JSON.parse(r);
-  } catch {}
+  // schedule, scheduleType, adjustedDays come from props (read once at CalendarScreen level)
   const WV_DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   function getPeriodsForDay(d: Date): ClassPeriod[] {
@@ -518,7 +508,7 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
       ? override
       : getDerivedBlockDay(key);
     const dowFull = WV_DAY_FULL[dow];
-    const adjDay  = wvAdjustedDays.find(a => a.label.toLowerCase().includes(dowFull.toLowerCase()));
+    const adjDay  = adjustedDays.find(a => a.label.toLowerCase().includes(dowFull.toLowerCase()));
     return schedule.filter(p => {
       if (!p.days.includes(dow)) return false;
       if (scheduleType !== 'block' || !p.blockDay) return true;
@@ -754,6 +744,32 @@ export default function CalendarScreen() {
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
+  // ── Schedule state — read once on mount, not on every render ──────────────
+  const [schedule,      setSchedule]      = useState<ClassPeriod[]>(() => {
+    try { const r = localStorage.getItem('trackit_class_schedule'); return r ? JSON.parse(r) : []; } catch { return []; }
+  });
+  const [scheduleType,  setScheduleType]  = useState<'standard' | 'block'>(() =>
+    (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard'
+  );
+  const [adjustedDays,  setAdjustedDays]  = useState<{ label: string; startH?: number; startM?: number; endH?: number; endM?: number }[]>(() => {
+    try { const r = localStorage.getItem('trackit_adjusted_days'); return r ? JSON.parse(r) : []; } catch { return []; }
+  });
+
+  // Re-sync schedule state when returning from ScheduleScreen
+  useEffect(() => {
+    function onFocus() {
+      try {
+        const r = localStorage.getItem('trackit_class_schedule');
+        setSchedule(r ? JSON.parse(r) : []);
+        setScheduleType((localStorage.getItem('trackit_schedule_type') as any) ?? 'standard');
+        const a = localStorage.getItem('trackit_adjusted_days');
+        setAdjustedDays(a ? JSON.parse(a) : []);
+      } catch {}
+    }
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
   // ── Zoom state (pinch-to-zoom scales hour height) ──────────────────────────
   const [hourPx, setHourPx] = useState(56);
   const HOUR_PX_MIN = 36;
@@ -780,7 +796,6 @@ export default function CalendarScreen() {
   // Walk backwards from dateKey to find the nearest override or anchor,
   // then count real school days (skipping Off) to determine odd/even.
   function getDerivedBlockDay(dateKey: string): 'A' | 'B' | null {
-    const scheduleType = localStorage.getItem('trackit_schedule_type') ?? 'standard';
     if (scheduleType !== 'block') return null;
 
     let anchor = localStorage.getItem('trackit_block_anchor');
@@ -1025,6 +1040,9 @@ export default function CalendarScreen() {
               setOverride={setOverride}
               hourPx={hourPx}
               getDerivedBlockDay={getDerivedBlockDay}
+              schedule={schedule}
+              scheduleType={scheduleType}
+              adjustedDays={adjustedDays}
             />
           ) : viewMode === 'week' ? (
             <WeekView
@@ -1038,6 +1056,9 @@ export default function CalendarScreen() {
               setOverride={setOverride}
               hourPx={hourPx}
               getDerivedBlockDay={getDerivedBlockDay}
+              schedule={schedule}
+              scheduleType={scheduleType}
+              adjustedDays={adjustedDays}
             />
           ) : (
             <MonthView
@@ -1081,7 +1102,7 @@ export interface ScheduleSettings {
   blockCycleStart?: 'A' | 'B'; // what day is "this Monday"
 }
 
-function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverride, hourPx, getDerivedBlockDay }: {
+function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverride, hourPx, getDerivedBlockDay, schedule, scheduleType, adjustedDays }: {
   dateKey:        string;
   allAssignments: Assignment[];
   onNavigate:     (screen: any, id?: string) => void;
@@ -1089,24 +1110,14 @@ function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverrid
   setOverride:    (key: string, val: 'A' | 'B' | 'off' | null) => void;
   hourPx:         number;
   getDerivedBlockDay: (key: string) => 'A' | 'B' | null;
+  schedule: ClassPeriod[];
+  scheduleType: 'standard' | 'block';
+  adjustedDays: { label: string; startH?: number; startM?: number; endH?: number; endM?: number }[];
 }) {
   const d    = new Date(dateKey + 'T00:00:00');
   const dow  = d.getDay();
 
-  let schedule: ClassPeriod[] = [];
-  let scheduleType: 'standard' | 'block' = 'standard';
-  try {
-    const raw = localStorage.getItem('trackit_class_schedule');
-    if (raw) schedule = JSON.parse(raw);
-    scheduleType = (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard';
-  } catch {}
-
-  // Load adjusted days and check if this date is one
-  let adjustedDays: { label: string; startH?: number; startM?: number; endH?: number; endM?: number }[] = [];
-  try {
-    const raw = localStorage.getItem('trackit_adjusted_days');
-    if (raw) adjustedDays = JSON.parse(raw);
-  } catch {}
+  // schedule, scheduleType, adjustedDays come from props (read once at CalendarScreen level)
   const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const dowFull = DAY_NAMES_FULL[d.getDay()];
   const adjDay = adjustedDays.find(a => a.label.toLowerCase().includes(dowFull.toLowerCase()));

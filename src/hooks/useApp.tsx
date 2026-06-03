@@ -16,6 +16,8 @@ interface AppState {
 
 interface AppCtx extends AppState {
   authed: boolean | null;
+  writeError: string | null;
+  clearWriteError: () => void;
   navigate: (screen: Screen, detailId?: string) => void;
   updateAssignments: (a: Assignment[], changed?: Assignment[]) => Promise<void>;
   upsertAssignments: (added: Assignment[]) => Promise<void>;
@@ -78,6 +80,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userId,      setUserId]      = useState<string | null>(null);
   const [userEmail,   setUserEmail]   = useState<string | null>(null);
   const [authed,      setAuthed]      = useState<boolean | null>(null);
+  const [writeError,  setWriteError]  = useState<string | null>(null);
+  const clearWriteError = useCallback(() => setWriteError(null), []);
 
   // useRef so callbacks always read the latest userId without needing it
   // in their dependency arrays. A plain object literal re-created each render
@@ -189,6 +193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.error('updateAssignments Supabase error:', JSON.stringify(error));
+      setWriteError('Failed to save assignments. Check your connection and try again.');
     }
   }, []);
 
@@ -238,7 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase
         .from('assignments')
         .upsert(rows, { onConflict: 'id' });
-      if (error) console.error('upsertAssignments error:', error.code, error.message);
+      if (error) { console.error("upsertAssignments error:", error.code, error.message); setWriteError("Failed to save assignments. Check your connection and try again."); }
     }
   }, []);
 
@@ -262,14 +267,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .delete()
       .eq('user_id', uid)
       .not('id', 'in', `(${updated.map(c => `"${c.id}"`).join(',')})`);
-    if (delErr) console.error('updateCourses delete:', delErr);
+    if (delErr) { console.error("updateCourses delete:", delErr); setWriteError("Failed to save classes. Check your connection and try again."); }
 
     if (updated.length > 0) {
       const rows = updated.map(c => toDbCourse(c, uid!));
       const { error } = await supabase
         .from('courses')
         .upsert(rows);
-      if (error) console.error('updateCourses error:', error.code, error.message);
+      if (error) { console.error("updateCourses error:", error.code, error.message); setWriteError("Failed to save classes. Check your connection and try again."); }
     }
   }, []);
 
@@ -285,7 +290,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('assignments')
       .upsert(toDbAssignment(updated, uid));
 
-    if (error) console.error('patchAssignment:', error);
+    if (error) { console.error("patchAssignment:", error); setWriteError("Failed to update assignment. Check your connection and try again."); }
   }, []);
 
   // ── deleteAssignment ───────────────────────────────────────────────────────
@@ -296,7 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!uid) { console.error('deleteAssignment: no userId'); return; }
 
     const { error } = await supabase.from('assignments').delete().eq('id', id);
-    if (error) console.error('deleteAssignment failed:', error);
+    if (error) { console.error("deleteAssignment failed:", error); setWriteError("Failed to delete assignment. Check your connection and try again."); }
   }, []);
 
   // ── updateSettings ─────────────────────────────────────────────────────────
@@ -362,6 +367,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       assignments, courses, screen, detailId, settings, loading, userId, userEmail, authed,
+      writeError, clearWriteError,
       navigate, updateAssignments, upsertAssignments, updateCourses,
       patchAssignment, deleteAssignment, updateSettings, reset, signOut,
     }}>

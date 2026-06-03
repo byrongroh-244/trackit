@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2048,
+          max_tokens: 4096,
           messages: [{
             role: 'user',
             content: [
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
               },
               {
                 type: 'text',
-                text: `Today is ${today}. Extract all assignments, tests, quizzes, and projects from this syllabus. Return ONLY a JSON array, no other text. Each item: name (string), dueDate (YYYY-MM-DD, skip if no date), type (homework|test|quiz|project|other). Only include items with a due date.`,
+                text: `Today is ${today}. Extract all assignments, tests, quizzes, and projects from this syllabus. Return ONLY a JSON array, no other text, no markdown. Each item: name (string), dueDate (YYYY-MM-DD, skip if no date), type (homework|test|quiz|project|other). Only include items with a due date. Keep names concise (under 60 chars).`,
               },
             ],
           }],
@@ -83,7 +83,20 @@ Deno.serve(async (req) => {
 
       const data  = await response.json();
       const text  = data.content.map((b: any) => b.text ?? '').join('');
-      const clean = text.replace(/```json|```/g, '').trim();
+      let clean   = text.replace(/```json|```/g, '').trim();
+
+      // If the response was cut off mid-array, close it gracefully
+      if (clean.startsWith('[') && !clean.endsWith(']')) {
+        const lastComma = clean.lastIndexOf(',');
+        const lastBrace = clean.lastIndexOf('}');
+        if (lastBrace > lastComma) {
+          clean = clean.slice(0, lastBrace + 1) + ']';
+        } else if (lastComma > 0) {
+          clean = clean.slice(0, lastComma) + ']';
+        } else {
+          clean = '[]';
+        }
+      }
 
       return new Response(clean, {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

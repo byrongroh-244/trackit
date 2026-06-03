@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../hooks/useApp';
 import { daysUntil } from '../data/store';
 import { Colors, SECTION_META, getSectionForDays, type Section } from '../theme';
@@ -62,52 +62,54 @@ export default function TodayScreen() {
 
   // ── Derived data ─────────────────────────────────────────────────────────────
   const lookahead = settings.agendaLookaheadDays;
-  const active = assignments.filter(a => {
-    if (a.done) return false;
-    if (lookahead === 0) return true;
-    return daysUntil(a.dueDate) <= lookahead;
-  });
-  const done = assignments.filter(a => a.done);
-  const hiddenCount = lookahead > 0
-    ? assignments.filter(a => !a.done && daysUntil(a.dueDate) > lookahead).length
-    : 0;
 
-  const grouped: Record<Section, Assignment[]> = {
-    needs_attention: [], coming_up: [], on_track: [],
-  };
-  active.forEach(a => {
-    const d = daysUntil(a.dueDate);
-    grouped[getSectionForDays(d)].push(a);
-  });
-  Object.values(grouped).forEach(arr =>
-    arr.sort((a, b) => daysUntil(a.dueDate) - daysUntil(b.dueDate))
-  );
+  const { active, done, hiddenCount, grouped, weekDays, showWeekStrip, startTarget } = useMemo(() => {
+    const active = assignments.filter(a => {
+      if (a.done) return false;
+      if (lookahead === 0) return true;
+      return daysUntil(a.dueDate) <= lookahead;
+    });
+    const done = assignments.filter(a => a.done);
+    const hiddenCount = lookahead > 0
+      ? assignments.filter(a => !a.done && daysUntil(a.dueDate) > lookahead).length
+      : 0;
 
-  // ── Week strip data ───────────────────────────────────────────────────────────
-  // Build a map of dateKey → assignments due that day (non-done only)
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const dateKey = dateKeyOffset(i);
-    const d       = new Date(dateKey + 'T00:00:00');
-    const items   = assignments.filter(a => !a.done && a.dueDate === dateKey);
-    return {
-      dateKey,
-      dayLabel:  DAY_LABELS[d.getDay()],
-      dateNum:   d.getDate(),
-      monthLabel: MONTH_SHORT[d.getMonth()],
-      items,
-      isToday: i === 0,
+    const grouped: Record<Section, Assignment[]> = {
+      needs_attention: [], coming_up: [], on_track: [],
     };
-  });
-  const showWeekStrip = assignments.length > 0;
+    active.forEach(a => {
+      const d = daysUntil(a.dueDate);
+      grouped[getSectionForDays(d)].push(a);
+    });
+    Object.values(grouped).forEach(arr =>
+      arr.sort((a, b) => daysUntil(a.dueDate) - daysUntil(b.dueDate))
+    );
 
-  // ── Start Now target ──────────────────────────────────────────────────────────
-  const startTarget = (() => {
-    if (active.length === 0) return null;
-    const sorted     = [...active].sort((a, b) => daysUntil(a.dueDate) - daysUntil(b.dueDate));
-    const assignment = sorted[0];
-    const nextStep   = (assignment.subtasks ?? []).find(s => !s.done) ?? null;
-    return { assignment, nextStep };
-  })();
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const dateKey = dateKeyOffset(i);
+      const d       = new Date(dateKey + 'T00:00:00');
+      const items   = assignments.filter(a => !a.done && a.dueDate === dateKey);
+      return {
+        dateKey,
+        dayLabel:   DAY_LABELS[d.getDay()],
+        dateNum:    d.getDate(),
+        monthLabel: MONTH_SHORT[d.getMonth()],
+        items,
+        isToday: i === 0,
+      };
+    });
+    const showWeekStrip = assignments.length > 0;
+
+    const startTarget = (() => {
+      if (active.length === 0) return null;
+      const sorted     = [...active].sort((a, b) => daysUntil(a.dueDate) - daysUntil(b.dueDate));
+      const assignment = sorted[0];
+      const nextStep   = (assignment.subtasks ?? []).find(s => !s.done) ?? null;
+      return { assignment, nextStep };
+    })();
+
+    return { active, done, hiddenCount, grouped, weekDays, showWeekStrip, startTarget };
+  }, [assignments, lookahead]);
 
   function handleStartNow() {
     if (!startTarget) return;

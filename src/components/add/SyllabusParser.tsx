@@ -190,9 +190,9 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
   const allSelected   = items.every(i => i.selected);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <SubHeader title="Review assignments" subtitle={`Found ${items.length} — uncheck to skip`} onBack={onCancel} />
-      <div style={{ padding: '16px 18px 18px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: Colors.surface, borderRadius: 10, border: '0.5px solid rgba(0,0,0,0.1)', marginBottom: 14 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: targetClass.color, flexShrink: 0 }} />
         <div style={{ fontSize: 13, color: Colors.textSecondary }}>Importing into <strong style={{ color: Colors.textPrimary }}>{targetClass.name}</strong></div>
@@ -248,7 +248,9 @@ export default function SyllabusParser({ targetClass, settings: _settings, onDon
           );
         })}
       </div>
-      <button onClick={() => onDone(items.filter(i => i.selected))} disabled={selectedCount === 0} style={{ width: '100%', padding: 14, borderRadius: 12, background: selectedCount > 0 ? Colors.forest : Colors.grayLight, color: selectedCount > 0 ? '#fff' : Colors.textHint, border: 'none', fontSize: 14, fontWeight: 700, cursor: selectedCount > 0 ? 'pointer' : 'default', fontFamily: 'inherit', marginBottom: 10 }}>
+      </div>
+      <div style={{ padding: '12px 18px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', borderTop: '1px solid rgba(0,0,0,0.06)', background: '#fff' }}>
+      <button onClick={() => onDone(items.filter(i => i.selected))} disabled={selectedCount === 0} style={{ width: '100%', padding: 14, borderRadius: 12, background: selectedCount > 0 ? Colors.forest : Colors.grayLight, color: selectedCount > 0 ? '#fff' : Colors.textHint, border: 'none', fontSize: 14, fontWeight: 700, cursor: selectedCount > 0 ? 'pointer' : 'default', fontFamily: 'inherit' }}>
         Save {selectedCount} assignment{selectedCount !== 1 ? 's' : ''}
       </button>
       </div>
