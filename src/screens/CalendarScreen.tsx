@@ -455,7 +455,7 @@ export interface ClassPeriod {
 // ── Week view ─────────────────────────────────────────────────────────────────
 // Identical visual to DayView — 7 columns side by side, same hour axis,
 // same class blocks, same free windows, same current-time line.
-function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay, onNavigate, dayOverrides, setOverride }: {
+function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay, onNavigate, dayOverrides, setOverride, hourPx, getDerivedBlockDay }: {
   weekStart: Date;
   byDate: Record<string, Assignment[]>;
   allAssignments: Assignment[];
@@ -464,6 +464,8 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
   onNavigate: (screen: any, id?: string) => void;
   dayOverrides: Record<string, 'A' | 'B' | 'off'>;
   setOverride: (key: string, val: 'A' | 'B' | 'off' | null) => void;
+  hourPx: number;
+  getDerivedBlockDay: (key: string) => 'A' | 'B' | null;
 }) {
   const t   = today();
   const now = new Date();
@@ -560,8 +562,11 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
                   {/* Lime pip under today */}
                   {isToday && <div style={{ width: 14, height: 2.5, borderRadius: 2, background: '#B8E04A', margin: '2px auto' }} />}
                   {/* A/B/off badge */}
-                  {(override === 'A' || override === 'B') && <div style={{ fontSize: 10, fontWeight: 700, color: Colors.forest }}>{override}-day</div>}
-                  {override === 'off' && <div style={{ fontSize: 10, fontWeight: 700, color: Colors.textHint }}>off</div>}
+                  {override === 'off' && <div style={{ fontSize: 10, fontWeight: 700, color: '#B86B12' }}>off</div>}
+                  {(override === 'A' || override === 'B') && (
+                    <div style={{ fontSize: 10, fontWeight: 700, color: Colors.forest }}>{override}-day ✎</div>
+                  )}
+                  {!override && (() => { const d = getDerivedBlockDay(key); return d ? <div style={{ fontSize: 10, fontWeight: 500, color: Colors.textHint }}>{d}-day</div> : null; })()}
                   {/* Due count badge */}
                   {active.length > 0 && (
                     <div style={{ fontSize: 11, fontWeight: 700, color: u.text, background: u.bg, borderRadius: 999, padding: '2px 7px', display: 'inline-block', marginTop: 3 }}>
@@ -726,6 +731,11 @@ export default function CalendarScreen() {
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
+  // ── Zoom state (pinch-to-zoom scales hour height) ──────────────────────────
+  const [hourPx, setHourPx] = useState(56);
+  const HOUR_PX_MIN = 36;
+  const HOUR_PX_MAX = 120;
+
   // ── Shared A/B day override state — used by both WeekView and DayView ────────
   const [dayOverrides, setDayOverrides] = useState<Record<string, 'A' | 'B' | 'off'>>(() => {
     try { return JSON.parse(localStorage.getItem('trackit_day_overrides') ?? '{}'); } catch { return {}; }
@@ -734,45 +744,108 @@ export default function CalendarScreen() {
   function setOverride(key: string, val: 'A' | 'B' | 'off' | null) {
     setDayOverrides(prev => {
       const next = { ...prev };
-      if (val === null) {
-        delete next[key];
-      } else {
-        next[key] = val;
-        // Cascade: infer next 14 weekdays alternating A/B
-        if (val === 'A' || val === 'B') {
-          let current = val;
-          const base  = new Date(key + 'T00:00:00');
-          let count   = 0;
-          for (let i = 1; i <= 28 && count < 14; i++) {
-            const dd = new Date(base);
-            dd.setDate(base.getDate() + i);
-            if (dd.getDay() === 0 || dd.getDay() === 6) continue;
-            const k = toKey(dd.getFullYear(), dd.getMonth(), dd.getDate());
-            current = current === 'A' ? 'B' : 'A';
-            if (!next[k]) next[k] = current;
-            count++;
-          }
-        }
-      }
+      if (val === null) { delete next[key]; }
+      else { next[key] = val; }
       try { localStorage.setItem('trackit_day_overrides', JSON.stringify(next)); } catch {}
       return next;
     });
+  }
+
+  // Derive A or B for any date purely from the anchor week + overrides.
+  // No stored inference — calculated on every render.
+  // anchor = the Monday of the first week classes were entered (= A-week)
+  // Walk backwards from dateKey to find the nearest override or anchor,
+  // then count real school days (skipping Off) to determine odd/even.
+  function getDerivedBlockDay(dateKey: string): 'A' | 'B' | null {
+    const scheduleType = localStorage.getItem('trackit_schedule_type') ?? 'standard';
+    if (scheduleType !== 'block') return null;
+
+    const anchor = localStorage.getItem('trackit_block_anchor');
+    if (!anchor) return null;
+
+    const target = new Date(dateKey + 'T00:00:00');
+    if (target.getDay() === 0 || target.getDay() === 6) return null; // skip weekends
+
+    const anchorDate = new Date(anchor + 'T00:00:00');
+
+    // ── Find the most recent A/B override at or before target ─────────────
+    // This becomes the new "anchor point" for the rolling 14-day window.
+    // If no override exists yet, the original anchor (= A) is used.
+    let nearestDate = anchorDate;
+    let nearestVal: 'A' | 'B' = 'A';
+
+    for (const [k, v] of Object.entries(dayOverrides)) {
+      if (v === 'off') continue; // Off days don't reset the sequence
+      const d = new Date(k + 'T00:00:00');
+      // Must be at or before target, and more recent than current nearest
+      if (d <= target && d >= anchorDate && d > nearestDate) {
+        nearestDate = d;
+        nearestVal  = v as 'A' | 'B';
+      }
+    }
+
+    // ── Count school days from nearestDate to target ───────────────────────
+    // Skip weekends and Off/PIR days — these don't count in the rotation.
+    // Each school day flips the rotation: A → B → A → B...
+    let count = 0;
+    const cursor = new Date(nearestDate);
+    cursor.setDate(cursor.getDate() + 1); // start the day AFTER the anchor
+
+    while (cursor <= target) {
+      const dow = cursor.getDay();
+      if (dow !== 0 && dow !== 6) { // weekday
+        const k = toKey(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+        if (dayOverrides[k] !== 'off') count++; // off days don't advance rotation
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // Even count = same as nearest anchor, odd = flipped
+    return count % 2 === 0 ? nearestVal : (nearestVal === 'A' ? 'B' : 'A');
   }
 
   // ── Swipe to navigate ─────────────────────────────────────────────────────
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
+  const pinchStartDist = useRef<number | null>(null);
+  const pinchStartHourPx = useRef<number>(56);
+
+  function getTouchDist(e: React.TouchEvent) {
+    if (e.touches.length < 2) return null;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
   function handleTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
+    if (e.touches.length === 2) {
+      pinchStartDist.current = getTouchDist(e);
+      pinchStartHourPx.current = hourPx;
+    } else {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+    }
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2 && pinchStartDist.current !== null) {
+      const dist  = getTouchDist(e);
+      if (!dist) return;
+      const scale = dist / pinchStartDist.current;
+      const next  = Math.round(Math.min(HOUR_PX_MAX, Math.max(HOUR_PX_MIN, pinchStartHourPx.current * scale)));
+      setHourPx(next);
+    }
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
+    if (pinchStartDist.current !== null) {
+      pinchStartDist.current = null;
+      return;
+    }
     if (touchStartX.current === null || touchStartY.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-    // Only horizontal swipes (dx > 50, dy < 60)
     if (Math.abs(dx) > 50 && dy < 60) {
       if (dx < 0) nextPeriod();
       else prevPeriod();
@@ -914,6 +987,7 @@ export default function CalendarScreen() {
         <div
           style={{ paddingTop: 10 }}
           onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
           {viewMode === 'day' ? (
@@ -923,6 +997,8 @@ export default function CalendarScreen() {
               onNavigate={navigate}
               dayOverrides={dayOverrides}
               setOverride={setOverride}
+              hourPx={hourPx}
+              getDerivedBlockDay={getDerivedBlockDay}
             />
           ) : viewMode === 'week' ? (
             <WeekView
@@ -934,6 +1010,8 @@ export default function CalendarScreen() {
               onNavigate={navigate}
               dayOverrides={dayOverrides}
               setOverride={setOverride}
+              hourPx={hourPx}
+              getDerivedBlockDay={getDerivedBlockDay}
             />
           ) : (
             <MonthView
@@ -977,12 +1055,14 @@ export interface ScheduleSettings {
   blockCycleStart?: 'A' | 'B'; // what day is "this Monday"
 }
 
-function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverride }: {
+function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverride, hourPx, getDerivedBlockDay }: {
   dateKey:        string;
   allAssignments: Assignment[];
   onNavigate:     (screen: any, id?: string) => void;
   dayOverrides:   Record<string, 'A' | 'B' | 'off'>;
   setOverride:    (key: string, val: 'A' | 'B' | 'off' | null) => void;
+  hourPx:         number;
+  getDerivedBlockDay: (key: string) => 'A' | 'B' | null;
 }) {
   const d    = new Date(dateKey + 'T00:00:00');
   const dow  = d.getDay();
@@ -998,18 +1078,23 @@ function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverrid
   const dayOverride = dayOverrides[dateKey] as 'A' | 'B' | 'off' | undefined;
   const isOff = dayOverride === 'off';
 
+  // Use explicit override if set, otherwise use derived block day
+  const effectiveBlockDay = (dayOverride === 'A' || dayOverride === 'B')
+    ? dayOverride
+    : getDerivedBlockDay(dateKey);
+
   const todayPeriods = isOff ? [] : schedule.filter(p => {
     if (!p.days.includes(dow)) return false;
     if (scheduleType !== 'block' || !p.blockDay) return true;
-    if (dayOverride === 'A' || dayOverride === 'B') return p.blockDay === dayOverride;
-    return true;
+    if (effectiveBlockDay) return p.blockDay === effectiveBlockDay;
+    return true; // no anchor yet, show all
   });
   const dayAssignments = allAssignments.filter(a => a.dueDate === dateKey && !a.done);
 
   // Hours to show: 7am – 6pm
   const START_HOUR = 7;
   const END_HOUR   = 18;
-  const HOUR_PX    = 56; // pixels per hour
+  const HOUR_PX    = hourPx; // controlled by pinch-to-zoom
 
   function toY(h: number, m: number) {
     return ((h - START_HOUR) + m / 60) * HOUR_PX;
@@ -1116,16 +1201,28 @@ function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverrid
         {/* Block day override controls */}
         {scheduleType === 'block' && !isOff && (
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Today is</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {dayOverride ? 'Override set' : `Auto: ${getDerivedBlockDay(dateKey) ?? '—'}-day`}
+              </div>
+              {dayOverride && (
+                <button onClick={() => setOverride(dateKey, null)}
+                  style={{ background: 'none', border: 'none', fontSize: 11, color: Colors.textHint, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Clear override
+                </button>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {(['A', 'B', 'off'] as const).map(opt => {
-                const active = dayOverride === opt || (!dayOverride && opt !== 'off');
                 const isActive = dayOverride === opt;
                 return (
-                  <button key={opt} onClick={() => {
-                    setOverride(dateKey, dayOverrides[dateKey] === opt ? null : opt);
-                  }}
-                    style={{ flex: 1, padding: '8px', borderRadius: 10, border: `1.5px solid ${isActive ? Colors.forest : '#E3EBEA'}`, background: isActive ? Colors.forest : '#fff', color: isActive ? '#fff' : Colors.textSecondary, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <button key={opt}
+                    onClick={() => setOverride(dateKey, isActive ? null : opt)}
+                    style={{ flex: 1, padding: '8px', borderRadius: 10, fontFamily: 'inherit', cursor: 'pointer',
+                      border: `1.5px solid ${isActive ? Colors.forest : '#E3EBEA'}`,
+                      background: isActive ? Colors.forest : '#fff',
+                      color: isActive ? '#fff' : Colors.textSecondary,
+                      fontSize: 13, fontWeight: 700 }}>
                     {opt === 'off' ? 'Off / PIR' : `${opt}-day`}
                   </button>
                 );

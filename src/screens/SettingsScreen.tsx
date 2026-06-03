@@ -152,7 +152,7 @@ function SettingsSectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function SettingsScreen() {
-  const { navigate, reset, settings, updateSettings, signOut, userEmail, courses } = useApp();
+  const { navigate, reset, settings, updateSettings, signOut, userEmail, courses, updateCourses, upsertAssignments } = useApp();
 
   // ── Class schedule ──────────────────────────────────────────────────────────
   const SCHEDULE_KEY  = 'trackit_class_schedule';
@@ -192,9 +192,65 @@ export default function SettingsScreen() {
       ? schedule.map(s => s === editingPeriod ? p : s)
       : [...schedule, p];
     setSchedule(updated); saveSchedule(updated);
+    // On first period added, record the Monday of this week as the A-week anchor
+    if (schedule.length === 0 && !editingPeriod) {
+      try {
+        if (!localStorage.getItem('trackit_block_anchor')) {
+          const now = new Date();
+          const day = now.getDay();
+          const monday = new Date(now);
+          monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+          const key = `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
+          localStorage.setItem('trackit_block_anchor', key);
+        }
+      } catch {}
+    }
     setEditingPeriod(null); setAddingPeriod(false);
   }
   const [highlight,         setHighlight]         = useState(false);
+  const [demoLoading,       setDemoLoading]       = useState(false);
+
+  async function runDemo() {
+    setDemoLoading(true);
+    try {
+      const today = new Date();
+      const d = (offset: number) => {
+        const dd = new Date(today);
+        dd.setDate(today.getDate() + offset);
+        return `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
+      };
+
+      const demoCourses: import('../types').Course[] = [
+        { id: 'demo-c1', name: 'AP Biology',  color: '#1E8A55' },
+        { id: 'demo-c2', name: 'US History',  color: '#CC3F3A' },
+        { id: 'demo-c3', name: 'Geometry',    color: '#7B6DD0' },
+        { id: 'demo-c4', name: 'English Lit', color: '#B86B12' },
+        { id: 'demo-c5', name: 'Spanish III', color: '#2764A8' },
+      ];
+
+      const demoAssignments: import('../types').Assignment[] = [
+        { id: 'demo-a1', name: 'Cell Division Essay',       className: 'AP Biology',  classId: null as any, classColor: '#1E8A55', dueDate: d(-3), done: false, type: 'homework', effort: null, subtasks: [{ id: 'demo-s1', text: 'Research mitosis phases', done: true, dueDate: null }, { id: 'demo-s2', text: 'Write introduction', done: false, dueDate: null }, { id: 'demo-s3', text: 'Draft body paragraphs', done: false, dueDate: null }], notes: '' },
+        { id: 'demo-a2', name: 'Chapter 7 Reading Quiz',    className: 'US History',  classId: null as any, classColor: '#CC3F3A', dueDate: d(0),  done: false, type: 'quiz',     effort: null, subtasks: [{ id: 'demo-s4', text: 'Review chapter 7 notes', done: false, dueDate: null }, { id: 'demo-s5', text: 'Complete practice questions', done: false, dueDate: null }], notes: 'Covers reconstruction era' },
+        { id: 'demo-a3', name: 'Mod 11 Review Sheet',       className: 'Geometry',    classId: null as any, classColor: '#7B6DD0', dueDate: d(0),  done: false, type: 'homework', effort: null, subtasks: [{ id: 'demo-s6', text: 'Complete problems 1-15', done: true, dueDate: null }, { id: 'demo-s7', text: 'Complete problems 16-30', done: false, dueDate: null }], notes: '' },
+        { id: 'demo-a4', name: 'Hamlet Act III Analysis',   className: 'English Lit', classId: null as any, classColor: '#B86B12', dueDate: d(1),  done: false, type: 'homework', effort: null, subtasks: [{ id: 'demo-s8', text: 'Re-read Act III scene 1', done: false, dueDate: null }, { id: 'demo-s9', text: 'Identify key soliloquies', done: false, dueDate: null }, { id: 'demo-s10', text: 'Write 2-page analysis', done: false, dueDate: null }], notes: '' },
+        { id: 'demo-a5', name: 'Mod 11 Test',               className: 'Geometry',    classId: null as any, classColor: '#7B6DD0', dueDate: d(3),  done: false, type: 'test',     effort: null, subtasks: [{ id: 'demo-s11', text: 'Review all review sheet answers', done: false, dueDate: null }, { id: 'demo-s12', text: 'Practice trig identities', done: false, dueDate: null }, { id: 'demo-s13', text: 'Do 2 practice tests', done: false, dueDate: null }], notes: '' },
+        { id: 'demo-a6', name: 'Vocabulario Capítulo 8',    className: 'Spanish III', classId: null as any, classColor: '#2764A8', dueDate: d(3),  done: false, type: 'homework', effort: null, subtasks: [{ id: 'demo-s14', text: 'Learn 20 new vocab words', done: false, dueDate: null }, { id: 'demo-s15', text: 'Complete workbook p.88-90', done: false, dueDate: null }], notes: '' },
+        { id: 'demo-a7', name: 'Cell Respiration Lab Report',className: 'AP Biology',  classId: null as any, classColor: '#1E8A55', dueDate: d(7),  done: false, type: 'homework', effort: null, subtasks: [{ id: 'demo-s16', text: 'Write hypothesis', done: false, dueDate: null }, { id: 'demo-s17', text: 'Compile lab data', done: false, dueDate: null }, { id: 'demo-s18', text: 'Write results section', done: false, dueDate: null }, { id: 'demo-s19', text: 'Write conclusion', done: false, dueDate: null }], notes: '' },
+        { id: 'demo-a8', name: 'WWII Essay',                className: 'US History',  classId: null as any, classColor: '#CC3F3A', dueDate: d(10), done: false, type: 'homework', effort: null, subtasks: [{ id: 'demo-s20', text: 'Choose a thesis', done: false, dueDate: null }, { id: 'demo-s21', text: 'Find 3 primary sources', done: false, dueDate: null }, { id: 'demo-s22', text: 'Create outline', done: false, dueDate: null }, { id: 'demo-s23', text: 'Write draft', done: false, dueDate: null }], notes: '' },
+        { id: 'demo-a9', name: 'Spanish Oral Presentation', className: 'Spanish III', classId: null as any, classColor: '#2764A8', dueDate: d(-5), done: true,  type: 'homework', effort: null, subtasks: [], notes: '' },
+      ];
+
+      // Load data first, then reset onboarding flag so the feature showcase runs
+      await updateCourses([...courses, ...demoCourses.filter(dc => !courses.some(c => c.id === dc.id))]);
+      await upsertAssignments(demoAssignments);
+      // Reset onboarding so the feature walkthrough plays from the start
+      await updateSettings({ ...settings, gradeLevel: 'hs_11', onboardingComplete: false });
+    } catch (e) {
+      console.error('Demo failed:', e);
+    } finally {
+      setDemoLoading(false);
+    }
+  }
   const [highlightSchedule, setHighlightSchedule] = useState(false);
   const [showChangePw,  setShowChangePw]  = useState(false);
   const [newPassword,   setNewPassword]   = useState('');
@@ -621,6 +677,29 @@ export default function SettingsScreen() {
                 </button>
               </div>
             )}
+          </Card>
+
+          {/* ── Demo ── */}
+          <SettingsSectionLabel>Demo</SettingsSectionLabel>
+          <Card>
+            <div style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary, marginBottom: 4 }}>Run a demo</div>
+              <div style={{ fontSize: 13, color: Colors.textHint, lineHeight: 1.5, marginBottom: 14 }}>
+                Loads sample classes and assignments, then plays the feature walkthrough — great for showing someone else how TrackIt works.
+              </div>
+              <button
+                onClick={runDemo}
+                disabled={demoLoading}
+                style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: demoLoading ? Colors.grayLight : Colors.forest, color: demoLoading ? Colors.textHint : '#fff', fontSize: 14, fontWeight: 700, cursor: demoLoading ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                {demoLoading ? 'Loading…' : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Start demo
+                  </>
+                )}
+              </button>
+            </div>
           </Card>
 
           <div style={{ textAlign: 'center', fontSize: 12, color: Colors.textHint, marginTop: 28 }}>TrackIt · v2.0.0</div>
