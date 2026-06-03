@@ -37,6 +37,11 @@ export default function ScheduleScreen() {
   const [scheduleType, setScheduleType] = useState<'standard' | 'block'>(() =>
     ((localStorage.getItem(SCHED_TYPE_KEY) as 'standard' | 'block') || 'standard')
   );
+
+  // Read adjusted days from settings
+  const adjDays: { label: string }[] = (() => {
+    try { return JSON.parse(localStorage.getItem('trackit_adjusted_days') ?? '[]'); } catch { return []; }
+  })();
   const [periods,      setPeriods]      = useState<ClassPeriod[]>(() => load(SCHEDULE_KEY, []));
   const [editing,      setEditing]      = useState<ClassPeriod | null>(null);
   const [showEditor,   setShowEditor]   = useState(false);
@@ -92,17 +97,29 @@ export default function ScheduleScreen() {
   const totalH = HOURS.length * HOUR_PX;
 
   // Get periods for a given day-of-week
-  // For block schedules, alternate A/B by week column so they don't visually overlap
-  // Mon=A, Tue=B, Wed=A, Thu=B, Fri=A (preview only — actual calendar uses real dates)
+  // Map dow (0=Sun) to full name for alt day matching
+  const DOW_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
   function periodsForDow(dow: number) {
     const previewDay = scheduleType === 'block'
       ? ([1,3,5].includes(dow) ? 'A' : 'B')
       : null;
-    return periods.filter(p => {
-      if (!p.days.includes(dow)) return false;
-      if (scheduleType !== 'block' || !p.blockDay) return true;
-      return p.blockDay === previewDay;
-    });
+    const dowName = DOW_FULL[dow];
+    const adjDay  = adjDays.find((a: { label: string }) =>
+      a.label.toLowerCase().includes(dowName.toLowerCase())
+    );
+    return periods
+      .filter(p => {
+        if (!p.days.includes(dow)) return false;
+        if (scheduleType !== 'block' || !p.blockDay) return true;
+        return p.blockDay === previewDay;
+      })
+      .map(p => {
+        if (adjDay && p.altStartHour != null && p.altEndHour != null) {
+          return { ...p, startHour: p.altStartHour, startMin: p.altStartMin ?? 0, endHour: p.altEndHour, endMin: p.altEndMin ?? 0 };
+        }
+        return p;
+      });
   }
 
   const WORK_DAYS = [1, 2, 3, 4, 5];
@@ -119,28 +136,40 @@ export default function ScheduleScreen() {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>Schedule</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>
-              {periods.length} class{periods.length !== 1 ? 'es' : ''} · {scheduleType === 'block' ? 'Block A/B' : 'Standard'}
+              {periods.length} class{periods.length !== 1 ? 'es' : ''} · {scheduleType === 'block' ? 'Block A/B' : 'Traditional'}
             </div>
           </div>
           <button
             onClick={() => { setEditing(null); setShowEditor(true); }}
-            style={{ background: '#B8E04A', border: 'none', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: Colors.forest, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add class
+            style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 10, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add
+          </button>
+          <button
+            onClick={() => navigate('calendar')}
+            style={{ background: '#B8E04A', border: 'none', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: Colors.forest }}>
+            Save
           </button>
         </div>
 
-        {/* Schedule type toggle + view mode */}
+        {/* Controls row: schedule type + view toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 14 }}>
-          {/* Schedule type */}
+          {/* Schedule type — reflects settings, can still toggle here */}
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 2, gap: 2 }}>
-            {(['standard', 'block'] as const).map(t => (
-              <button key={t} onClick={() => saveType(t)}
+            {([['standard','Traditional'],['block','Block A/B']] as const).map(([t, label]) => (
+              <button key={t} onClick={() => saveType(t as 'standard' | 'block')}
                 style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: scheduleType === t ? '#fff' : 'transparent', color: scheduleType === t ? Colors.forest : 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: scheduleType === t ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                {t === 'standard' ? 'Standard' : 'Block A/B'}
+                {label}
               </button>
             ))}
           </div>
+
+          {/* Alt day badge — shows if one is configured */}
+          {scheduleType === 'block' && adjDays.length > 0 && (
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
+              Alt: {adjDays[0].label}
+            </div>
+          )}
 
           <div style={{ marginLeft: 'auto', display: 'flex', background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 2, gap: 2 }}>
             {(['week', 'day'] as const).map(v => (
@@ -174,7 +203,7 @@ export default function ScheduleScreen() {
             </div>
             <div style={{ fontSize: 18, fontWeight: 800, color: Colors.textPrimary, letterSpacing: '-0.02em' }}>No classes yet</div>
             <div style={{ fontSize: 14, color: Colors.textHint, lineHeight: 1.6, maxWidth: 260 }}>
-              Tap "Add class" to build your schedule. Your classes will appear on the day and week views in Calendar.
+              Tap "Add +" to build your schedule. Your classes will appear on the day and week views in Calendar.
             </div>
             <button onClick={() => { setEditing(null); setShowEditor(true); }}
               style={{ marginTop: 8, padding: '13px 28px', borderRadius: 12, border: 'none', background: Colors.forest, color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -288,7 +317,7 @@ export default function ScheduleScreen() {
                     <div style={{ fontSize: 13, color: Colors.textHint }}>No classes on {DAY_LABELS[viewDay]}</div>
                     <button onClick={() => { setEditing(null); setShowEditor(true); }}
                       style={{ marginTop: 10, padding: '8px 16px', borderRadius: 8, border: 'none', background: Colors.forest, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      Add class
+                      Add
                     </button>
                   </div>
                 )}

@@ -441,15 +441,19 @@ function MonthView({ year, month, byDate, allAssignments, selectedKey, onSelectD
 }
 
 export interface ClassPeriod {
-  name:      string;
-  color:     string;
-  days:      number[];   // 0=Sun, 1=Mon … 6=Sat
-  startHour: number;
-  startMin:  number;
-  endHour:   number;
-  endMin:    number;
-  room?:     string;
-  blockDay?: 'A' | 'B' | null;  // null = standard, 'A' or 'B' = block schedule rotation
+  name:         string;
+  color:        string;
+  days:         number[];   // 0=Sun, 1=Mon … 6=Sat
+  startHour:    number;
+  startMin:     number;
+  endHour:      number;
+  endMin:       number;
+  room?:        string;
+  blockDay?:    'A' | 'B' | null;
+  altStartHour?: number;  // alt day (late start/early release) start
+  altStartMin?:  number;
+  altEndHour?:   number;
+  altEndMin?:    number;
 }
 
 // ── Week view ─────────────────────────────────────────────────────────────────
@@ -497,20 +501,35 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
     scheduleType = (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard';
   } catch {}
 
+  // Load adjusted days once for WeekView
+  let wvAdjustedDays: { label: string }[] = [];
+  try {
+    const r = localStorage.getItem('trackit_adjusted_days');
+    if (r) wvAdjustedDays = JSON.parse(r);
+  } catch {}
+  const WV_DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
   function getPeriodsForDay(d: Date): ClassPeriod[] {
     const dow = d.getDay();
     const key = toKey(d.getFullYear(), d.getMonth(), d.getDate());
     const override = dayOverrides[key] as 'A' | 'B' | 'off' | undefined;
     if (override === 'off') return [];
-    // Use explicit override, then derived block day, then show all
     const effectiveDay = (override === 'A' || override === 'B')
       ? override
       : getDerivedBlockDay(key);
+    const dowFull = WV_DAY_FULL[dow];
+    const adjDay  = wvAdjustedDays.find(a => a.label.toLowerCase().includes(dowFull.toLowerCase()));
     return schedule.filter(p => {
       if (!p.days.includes(dow)) return false;
       if (scheduleType !== 'block' || !p.blockDay) return true;
       if (effectiveDay) return p.blockDay === effectiveDay;
-      return true; // no anchor yet — show all
+      return true;
+    }).map(p => {
+      // On alt days, swap in the alt times stored on the period
+      if (adjDay && p.altStartHour != null && p.altEndHour != null) {
+        return { ...p, startHour: p.altStartHour, startMin: p.altStartMin ?? 0, endHour: p.altEndHour, endMin: p.altEndMin ?? 0 };
+      }
+      return p;
     });
   }
 
@@ -554,8 +573,8 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
               const active  = (byDate[key] ?? []).filter(a => !a.done);
               const u       = getUrgencyConfig(daysUntil(key));
               return (
-                <div key={key} style={{ flex: 1, textAlign: 'center' }}>
-                  {/* Day name — same font as DayView hour labels */}
+                <div key={key} onClick={() => onSelectDay(key)} style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
+                  {/* Day name */}
                   <div style={{ fontSize: 10, fontWeight: 700, color: isToday ? Colors.forest : Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {DAYS[d.getDay()].slice(0,2)}
                   </div>
@@ -568,7 +587,7 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
                   {/* A/B/off badge */}
                   {override === 'off' && <div style={{ fontSize: 10, fontWeight: 700, color: '#B86B12' }}>off</div>}
                   {(override === 'A' || override === 'B') && (
-                    <div style={{ fontSize: 10, fontWeight: 700, color: Colors.forest }}>{override}-day ✎</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: Colors.forest }}>{override}-day</div>
                   )}
                   {!override && (() => { const d = getDerivedBlockDay(key); return d ? <div style={{ fontSize: 10, fontWeight: 500, color: Colors.textHint }}>{d}-day</div> : null; })()}
                   {/* Due count badge */}
@@ -1082,6 +1101,16 @@ function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverrid
     scheduleType = (localStorage.getItem('trackit_schedule_type') as any) ?? 'standard';
   } catch {}
 
+  // Load adjusted days and check if this date is one
+  let adjustedDays: { label: string; startH?: number; startM?: number; endH?: number; endM?: number }[] = [];
+  try {
+    const raw = localStorage.getItem('trackit_adjusted_days');
+    if (raw) adjustedDays = JSON.parse(raw);
+  } catch {}
+  const DAY_NAMES_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dowFull = DAY_NAMES_FULL[d.getDay()];
+  const adjDay = adjustedDays.find(a => a.label.toLowerCase().includes(dowFull.toLowerCase()));
+
   const dayOverride = dayOverrides[dateKey] as 'A' | 'B' | 'off' | undefined;
   const isOff = dayOverride === 'off';
 
@@ -1094,7 +1123,13 @@ function DayView({ dateKey, allAssignments, onNavigate, dayOverrides, setOverrid
     if (!p.days.includes(dow)) return false;
     if (scheduleType !== 'block' || !p.blockDay) return true;
     if (effectiveBlockDay) return p.blockDay === effectiveBlockDay;
-    return true; // no anchor yet, show all
+    return true;
+  }).map(p => {
+    // On an adjusted day, swap in alt times if they were set
+    if (adjDay && p.altStartHour != null && p.altEndHour != null) {
+      return { ...p, startHour: p.altStartHour, startMin: p.altStartMin ?? 0, endHour: p.altEndHour, endMin: p.altEndMin ?? 0 };
+    }
+    return p;
   });
   const dayAssignments = allAssignments.filter(a => a.dueDate === dateKey && !a.done);
 

@@ -14,7 +14,7 @@ interface Props {
 const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 // ── Native wheel time picker — triggers OS clock wheel on mobile ─────────────
-const HOURS   = Array.from({ length: 16 }, (_, i) => i + 6); // 6–21
+const HOURS   = Array.from({ length: 15 }, (_, i) => i + 7); // 7am–9pm
 const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 function fmt(h: number, m: number) {
@@ -42,21 +42,41 @@ function TimePicker({ label, hour, minute, onChange }: {
   label: string; hour: number; minute: number;
   onChange: (h: number, m: number) => void;
 }) {
+  const isPm = hour >= 12;
+  // Clock-order hours for current AM/PM: 12, 1, 2 ... 11
+  // AM: 12(=0), 1-11 maps to 0, 1-11 (24h)
+  // PM: 12(=12), 1-11 maps to 12, 13-23 (24h)
+  const clockHours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  function clockTo24(clockH: number, pm: boolean): number {
+    if (clockH === 12) return pm ? 12 : 0;
+    return pm ? clockH + 12 : clockH;
+  }
+  function hour24ToClock(h24: number): number {
+    if (h24 === 0) return 12;
+    if (h24 > 12) return h24 - 12;
+    return h24;
+  }
+  const clockVal = hour24ToClock(hour);
+
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F7F6', borderRadius: 14, padding: '10px 16px', width: 'fit-content' }}>
-        <select value={hour} onChange={e => onChange(Number(e.target.value), minute)} style={selStyle}>
-          {HOURS.map(h => <option key={h} value={h}>{h > 12 ? h - 12 : h === 0 ? 12 : h}</option>)}
+        {/* Hour — clock order 12,1,2...11 */}
+        <select value={clockVal} onChange={e => onChange(clockTo24(Number(e.target.value), isPm), minute)} style={selStyle}>
+          {clockHours.map(h => <option key={h} value={h}>{h}</option>)}
         </select>
-        <span style={{ fontSize: 22, fontWeight: 800, color: Colors.forest, marginBottom: 2 }}>:</span>
+        <span style={{ fontSize: 22, fontWeight: 800, color: Colors.forest }}>:</span>
+        {/* Minute */}
         <select value={minute} onChange={e => onChange(hour, Number(e.target.value))} style={selStyle}>
           {MINUTES.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
         </select>
-        <select value={hour >= 12 ? 'pm' : 'am'} onChange={e => {
+        {/* AM/PM */}
+        <select value={isPm ? 'pm' : 'am'} onChange={e => {
           const pm = e.target.value === 'pm';
-          if (pm && hour < 12) onChange(hour + 12, minute);
-          if (!pm && hour >= 12) onChange(hour - 12, minute);
+          const newH = clockTo24(clockVal, pm);
+          if (newH >= 7 && newH <= 21) onChange(newH, minute);
         }} style={{ ...selStyle, fontSize: 16, color: Colors.textSecondary }}>
           <option value="am">am</option>
           <option value="pm">pm</option>
@@ -72,6 +92,8 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
     // If editing a period whose class isn't in courses list, prefill custom name
     initial && !courses.find(c => c.name === initial.name) ? initial.name : ''
   );
+  const [customTeacher, setCustomTeacher] = useState('');
+  const [customRoom,    setCustomRoom]    = useState('');
   const [showCustom,  setShowCustom]  = useState(
     !!(initial && !courses.find(c => c.name === initial.name))
   );
@@ -83,20 +105,28 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
   const [endH,     setEndH]     = useState(initial?.endHour   ?? 8);
   const [endM,     setEndM]     = useState(initial?.endMin    ?? 50);
   const [room,     setRoom]     = useState(initial?.room      ?? '');
-  const [blockDay, setBlockDay] = useState<'A' | 'B' | null>(initial?.blockDay ?? null);
+  const [blockDay,   setBlockDay]   = useState<'A' | 'B' | null>(initial?.blockDay ?? null);
+  // Alt day times (late start / early release variant times)
+  const [altTimesSet, setAltTimesSet] = useState(!!(initial?.altStartHour));
+  const [altStartH,  setAltStartH]  = useState(initial?.altStartHour ?? 9);
+  const [altStartM,  setAltStartM]  = useState(initial?.altStartMin  ?? 0);
+  const [altEndH,    setAltEndH]    = useState(initial?.altEndHour   ?? 14);
+  const [altEndM,    setAltEndM]    = useState(initial?.altEndMin    ?? 0);
 
   function toggleDay(d: number) {
     setDays(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d].sort());
   }
 
   const dur     = durLabel(startH, startM, endH, endM);
-  const effectiveName  = course?.name ?? customName.trim();
-  const effectiveColor = course?.color ?? '#1c4a4f';
+  const effectiveName    = course?.name    ?? customName.trim();
+  const effectiveColor   = course?.color   ?? '#1c4a4f';
+  const effectiveTeacher = course?.teacherName ?? customTeacher.trim();
+  const effectiveRoom    = course ? (room.trim() || undefined) : (customRoom.trim() || undefined);
   const canSave = !!effectiveName && (scheduleType === 'block' || days.length > 0) && (endH * 60 + endM) > (startH * 60 + startM);
 
   function save() {
     if (!canSave || !effectiveName) return;
-    onSave({ name: effectiveName, color: effectiveColor, days, startHour: startH, startMin: startM, endHour: endH, endMin: endM, room: room.trim() || undefined, blockDay: scheduleType === 'block' ? blockDay : null });
+    onSave({ name: effectiveName, color: effectiveColor, days, startHour: startH, startMin: startM, endHour: endH, endMin: endM, room: effectiveRoom, blockDay: scheduleType === 'block' ? blockDay : null, ...(altTimesSet ? { altStartHour: altStartH, altStartMin: altStartM, altEndHour: altEndH, altEndMin: altEndM } : {}) });
   }
 
   return (
@@ -109,12 +139,17 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
           <div style={{ width:36,height:4,borderRadius:2,background:'#E3EBEA' }} />
         </div>
 
-        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 20px 14px',borderBottom:'0.5px solid #E3EBEA' }}>
-          <span style={{ fontSize:17,fontWeight:800,color:Colors.textPrimary,letterSpacing:'-.02em' }}>
+        <div style={{ background: Colors.forest, borderRadius:'22px 22px 0 0', padding:'16px 18px', display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+          <button onClick={onCancel} aria-label="Cancel"
+            style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:8, width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div style={{ flex:1, fontSize:17, fontWeight:800, color:'#fff', letterSpacing:'-.02em' }}>
             {initial ? 'Edit period' : 'Add class period'}
-          </span>
-          <button onClick={onCancel} aria-label="Close" style={{ background:'none',border:'none',cursor:'pointer',padding:4,color:Colors.textHint }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+          <button onClick={save} disabled={!canSave} aria-label="Save"
+            style={{ background: canSave ? '#B8E04A' : 'rgba(255,255,255,0.15)', border:'none', borderRadius:10, padding:'7px 16px', cursor: canSave ? 'pointer' : 'default', fontFamily:'inherit', fontSize:13, fontWeight:700, color: canSave ? Colors.forest : 'rgba(255,255,255,0.4)' }}>
+            {initial ? 'Save' : 'Add'}
           </button>
         </div>
 
@@ -146,7 +181,7 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
           ) : (
             <div style={{ marginTop: 4 }}>
               <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>New class name</label>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 <input autoFocus value={customName} onChange={e => setCustomName(e.target.value)}
                   placeholder="e.g. AP Chemistry"
                   style={{ flex: 1, fontSize: 14, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${Colors.forest}`, outline: 'none', fontFamily: 'inherit', color: Colors.textPrimary, background: Colors.background }} />
@@ -155,6 +190,12 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
                   Cancel
                 </button>
               </div>
+              <input value={customTeacher} onChange={e => setCustomTeacher(e.target.value)}
+                placeholder="Teacher name (optional)"
+                style={{ width: '100%', fontSize: 14, padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E3EBEA', outline: 'none', fontFamily: 'inherit', color: Colors.textPrimary, background: Colors.background, boxSizing: 'border-box', marginBottom: 8 }} />
+              <input value={customRoom} onChange={e => setCustomRoom(e.target.value)}
+                placeholder="Room number (optional)"
+                style={{ width: '100%', fontSize: 14, padding: '10px 12px', borderRadius: 10, border: '1.5px solid #E3EBEA', outline: 'none', fontFamily: 'inherit', color: Colors.textPrimary, background: Colors.background, boxSizing: 'border-box' }} />
             </div>
           )}
           </div>
@@ -178,52 +219,85 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
           )}
 
           {/* Block rotation */}
-          {scheduleType === 'block' && (
-            <div>
-              <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10 }}>Rotation</div>
-              <div style={{ display:'flex',gap:8 }}>
-                {(['A','B',null] as const).map(opt => {
-                  const on = blockDay === opt;
-                  return (
-                    <button key={String(opt)} onClick={() => setBlockDay(opt)}
-                      style={{ flex:1,padding:'10px',borderRadius:12,border:`1.5px solid ${on ? Colors.forest : '#E3EBEA'}`,background: on ? Colors.forest : '#fff',color: on ? '#fff' : Colors.textSecondary,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all .15s' }}>
-                      {opt === null ? 'Both' : `${opt}-day`}
-                    </button>
-                  );
-                })}
+          {scheduleType === 'block' && (() => {
+            // Load adjusted day label from onboarding (e.g. "Late Start Wednesday")
+            let adjLabel = 'Alternate day';
+            try {
+              const adj = JSON.parse(localStorage.getItem('trackit_adjusted_days') ?? '[]');
+              if (adj.length > 0) adjLabel = adj[0].label;
+            } catch {}
+            return (
+              <div>
+                <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6 }}>Rotation day</div>
+                <div style={{ fontSize:11,color:Colors.textHint,marginBottom:10,lineHeight:1.4 }}>
+                  A-day and B-day classes alternate. "Every day" classes meet regardless of rotation — e.g. homeroom or study hall.
+                </div>
+                <div style={{ display:'flex',gap:8 }}>
+                  {(['A','B',null] as const).map(opt => {
+                    const on = blockDay === opt;
+                    return (
+                      <button key={String(opt)} onClick={() => setBlockDay(opt)}
+                        style={{ flex:1,padding:'10px',borderRadius:12,border:`1.5px solid ${on ? Colors.forest : '#E3EBEA'}`,background: on ? Colors.forest : '#fff',color: on ? '#fff' : Colors.textSecondary,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all .15s' }}>
+                        {opt === null ? 'Every day' : `${opt}-day`}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+            );
+          })()}
+
+          {/* Time — two side-by-side bins */}
+          <div>
+            <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10 }}>Class times</div>
+            <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
+
+              {/* Regular day */}
+              <div style={{ background:'#F5F7F6',borderRadius:14,padding:'14px 14px 10px' }}>
+                <div style={{ fontSize:11,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:10 }}>Regular</div>
+                <TimePicker label="Start" hour={startH} minute={startM} onChange={(h, m) => {
+                  setStartH(h); setStartM(m);
+                  if (h * 60 + m >= endH * 60 + endM) {
+                    const e = h * 60 + m + 50;
+                    setEndH(Math.min(21, Math.floor(e/60)));
+                    setEndM(e%60 > 55 ? 55 : Math.round((e%60)/5)*5);
+                  }
+                }} />
+                <div style={{ height:10 }} />
+                <TimePicker label="End" hour={endH} minute={endM} onChange={(h,m) => { setEndH(h); setEndM(m); }} />
+                {dur && <div style={{ fontSize:11,fontWeight:600,color:Colors.forest,marginTop:6,textAlign:'center' }}>{dur}</div>}
+              </div>
+
+              {/* Alt day (late start / early release) */}
+              <div style={{ background:'#F5F7F6',borderRadius:14,padding:'14px 14px 10px' }}>
+                <div style={{ fontSize:11,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:10 }}>Alt day</div>
+                <TimePicker label="Start" hour={altStartH} minute={altStartM} onChange={(h,m) => {
+                  setAltTimesSet(true); setAltStartH(h); setAltStartM(m);
+                  if (h * 60 + m >= altEndH * 60 + altEndM) {
+                    const e = h * 60 + m + 50;
+                    setAltEndH(Math.min(21, Math.floor(e/60)));
+                    setAltEndM(e%60 > 55 ? 55 : Math.round((e%60)/5)*5);
+                  }
+                }} />
+                <div style={{ height:10 }} />
+                <TimePicker label="End" hour={altEndH} minute={altEndM} onChange={(h,m) => { setAltTimesSet(true); setAltEndH(h); setAltEndM(m); }} />
+                {(() => { const m = altEndH*60+altEndM-(altStartH*60+altStartM); if(m<=0) return null; const h=Math.floor(m/60),mn=m%60; return <div style={{ fontSize:11,fontWeight:600,color:Colors.forest,marginTop:6,textAlign:'center' }}>{`${h>0?h+'h ':''}`}{mn>0?`${mn}m`:''}</div>; })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Room — only shown when adding a new class */}
+          {showCustom && (
+            <div>
+              <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8 }}>
+                Room <span style={{ fontWeight:400,textTransform:'none',letterSpacing:0,fontSize:11,opacity:.7 }}>(optional)</span>
+              </div>
+              <input value={room} onChange={e => setRoom(e.target.value)} placeholder="e.g. Rm 204"
+                style={{ width:'100%',fontSize:15,padding:'12px 14px',borderRadius:12,border:'1.5px solid #E3EBEA',outline:'none',fontFamily:'inherit',color:Colors.textPrimary,background:'#fff',boxSizing:'border-box' }} />
             </div>
           )}
 
-          {/* Time */}
-          <div style={{ background:'#F5F7F6',borderRadius:18,padding:'18px 18px 14px',display:'flex',flexDirection:'column',gap:16 }}>
-            <TimePicker label="Start" hour={startH} minute={startM} onChange={(h, m) => {
-              setStartH(h); setStartM(m);
-              if (h * 60 + m >= endH * 60 + endM) {
-                const e = h * 60 + m + 50;
-                setEndH(Math.min(21, Math.floor(e / 60)));
-                setEndM(e % 60 > 55 ? 55 : Math.round((e % 60) / 5) * 5);
-              }
-            }} />
-            <TimePicker label="End" hour={endH} minute={endM} onChange={(h, m) => { setEndH(h); setEndM(m); }} />
-            {dur && (
-              <div style={{ textAlign:'center',fontSize:13,fontWeight:600,color:Colors.forest }}>{dur} class period</div>
-            )}
-          </div>
 
-          {/* Room */}
-          <div>
-            <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8 }}>
-              Room <span style={{ fontWeight:400,textTransform:'none',letterSpacing:0,fontSize:11,opacity:.7 }}>(optional)</span>
-            </div>
-            <input value={room} onChange={e => setRoom(e.target.value)} placeholder="e.g. Rm 204"
-              style={{ width:'100%',fontSize:15,padding:'12px 14px',borderRadius:12,border:'1.5px solid #E3EBEA',outline:'none',fontFamily:'inherit',color:Colors.textPrimary,background:'#fff',boxSizing:'border-box' }} />
-          </div>
-
-          <button onClick={save} disabled={!canSave}
-            style={{ width:'100%',padding:'15px',borderRadius:14,border:'none',background: canSave ? Colors.forest : '#E3EBEA',color: canSave ? '#fff' : Colors.textHint,fontSize:16,fontWeight:800,cursor: canSave ? 'pointer' : 'default',fontFamily:'inherit',letterSpacing:'-.01em',transition:'background .2s' }}>
-            {initial ? 'Save changes' : 'Add to schedule'}
-          </button>
         </div>
       </div>
     </>
