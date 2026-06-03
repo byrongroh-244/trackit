@@ -16,6 +16,7 @@ const DetailScreen   = lazy(() => import('./screens/DetailScreen'));
 const CanvasScreen   = lazy(() => import('./screens/CanvasScreen'));
 const SettingsScreen = lazy(() => import('./screens/SettingsScreen'));
 const CalendarScreen = lazy(() => import('./screens/CalendarScreen'));
+const ScheduleScreen = lazy(() => import('./screens/ScheduleScreen'));
 
 // ── Minimal screen-level loading fallback ────────────────────────────────────
 function ScreenFallback() {
@@ -95,6 +96,7 @@ function Router() {
         {screen === 'canvas'   && <CanvasScreen />}
         {screen === 'settings' && <SettingsScreen />}
         {screen === 'calendar' && <CalendarScreen />}
+        {screen === 'schedule' && <ScheduleScreen />}
       </Suspense>
     </div>
   );

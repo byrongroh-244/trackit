@@ -67,7 +67,14 @@ function TimePicker({ label, hour, minute, onChange }: {
 }
 
 export default function PeriodEditor({ initial, courses, scheduleType, onSave, onCancel }: Props) {
-  const [course,   setCourse]   = useState<Course | null>(initial ? courses.find(c => c.name === initial.name) ?? null : null);
+  const [course,      setCourse]      = useState<Course | null>(initial ? courses.find(c => c.name === initial.name) ?? null : null);
+  const [customName,  setCustomName]  = useState(
+    // If editing a period whose class isn't in courses list, prefill custom name
+    initial && !courses.find(c => c.name === initial.name) ? initial.name : ''
+  );
+  const [showCustom,  setShowCustom]  = useState(
+    !!(initial && !courses.find(c => c.name === initial.name))
+  );
   const [days,     setDays]     = useState<number[]>(
     initial?.days ?? (scheduleType === 'block' ? [1,2,3,4,5] : [])
   );
@@ -83,11 +90,13 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
   }
 
   const dur     = durLabel(startH, startM, endH, endM);
-  const canSave = !!course && (scheduleType === 'block' || days.length > 0) && (endH * 60 + endM) > (startH * 60 + startM);
+  const effectiveName  = course?.name ?? customName.trim();
+  const effectiveColor = course?.color ?? '#1c4a4f';
+  const canSave = !!effectiveName && (scheduleType === 'block' || days.length > 0) && (endH * 60 + endM) > (startH * 60 + startM);
 
   function save() {
-    if (!canSave || !course) return;
-    onSave({ name: course.name, color: course.color, days, startHour: startH, startMin: startM, endHour: endH, endMin: endM, room: room.trim() || undefined, blockDay: scheduleType === 'block' ? blockDay : null });
+    if (!canSave || !effectiveName) return;
+    onSave({ name: effectiveName, color: effectiveColor, days, startHour: startH, startMin: startM, endHour: endH, endMin: endM, room: room.trim() || undefined, blockDay: scheduleType === 'block' ? blockDay : null });
   }
 
   return (
@@ -127,6 +136,27 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
                 );
               })}
             </div>
+
+          {/* New class — shown when no existing class matches */}
+          {!showCustom ? (
+            <button onClick={() => { setShowCustom(true); setCourse(null); }}
+              style={{ width: '100%', marginTop: 4, padding: '10px', borderRadius: 12, border: `1.5px dashed ${Colors.forest}`, background: 'transparent', color: Colors.forest, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              + New class not in list
+            </button>
+          ) : (
+            <div style={{ marginTop: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>New class name</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input autoFocus value={customName} onChange={e => setCustomName(e.target.value)}
+                  placeholder="e.g. AP Chemistry"
+                  style={{ flex: 1, fontSize: 14, padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${Colors.forest}`, outline: 'none', fontFamily: 'inherit', color: Colors.textPrimary, background: Colors.background }} />
+                <button onClick={() => { setShowCustom(false); setCustomName(''); }}
+                  style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #E3EBEA', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: Colors.textSecondary }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           </div>
 
           {/* Days — hidden for block schedule (all weekdays implied) */}

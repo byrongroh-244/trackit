@@ -30,6 +30,7 @@ export interface Course {
   color: string;
   description?: string;
   teacherName?: string;
+  room?: string;
   canvasName?: string;  // original Canvas name, used for sync dedup
   canvasId?: number;    // Canvas course ID, most reliable match key
 }
@@ -51,6 +52,7 @@ export type Screen =
   | 'canvas'
   | 'settings'
   | 'calendar'
+  | 'schedule'
   | 'onboarding';
 
 // ── Deadline Recovery System ──────────────────────────────────────────────────

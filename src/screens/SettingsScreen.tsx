@@ -167,6 +167,17 @@ export default function SettingsScreen() {
   function loadSchedType(): 'standard' | 'block' {
     try { return (localStorage.getItem(SCHED_TYPE_KEY) as any) ?? 'standard'; } catch { return 'standard'; }
   }
+  function ensureBlockAnchor() {
+    if (!localStorage.getItem('trackit_block_anchor')) {
+      const now = new Date();
+      const dow = now.getDay();
+      const mon = new Date(now);
+      mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+      localStorage.setItem('trackit_block_anchor',
+        `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`
+      );
+    }
+  }
 
   const [scheduleType,  setSchedType]     = useState<'standard' | 'block'>(loadSchedType);
   const [schedule,      setSchedule]      = useState(loadSchedule);
@@ -519,11 +530,14 @@ export default function SettingsScreen() {
               </div>
             ))}
             <button
-              onClick={() => { setEditingPeriod(null); setAddingPeriod(true); }}
-              style={{ width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: Colors.forest, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}
+              onClick={() => navigate('schedule')}
+              style={{ width: '100%', padding: '13px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, color: Colors.forest, textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add a class period
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Open schedule builder
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={Colors.forest} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           </Card>
 

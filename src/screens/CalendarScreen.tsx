@@ -502,11 +502,15 @@ function WeekView({ weekStart, byDate, allAssignments, selectedKey, onSelectDay,
     const key = toKey(d.getFullYear(), d.getMonth(), d.getDate());
     const override = dayOverrides[key] as 'A' | 'B' | 'off' | undefined;
     if (override === 'off') return [];
+    // Use explicit override, then derived block day, then show all
+    const effectiveDay = (override === 'A' || override === 'B')
+      ? override
+      : getDerivedBlockDay(key);
     return schedule.filter(p => {
       if (!p.days.includes(dow)) return false;
       if (scheduleType !== 'block' || !p.blockDay) return true;
-      if (override === 'A' || override === 'B') return p.blockDay === override;
-      return true;
+      if (effectiveDay) return p.blockDay === effectiveDay;
+      return true; // no anchor yet — show all
     });
   }
 
@@ -760,8 +764,16 @@ export default function CalendarScreen() {
     const scheduleType = localStorage.getItem('trackit_schedule_type') ?? 'standard';
     if (scheduleType !== 'block') return null;
 
-    const anchor = localStorage.getItem('trackit_block_anchor');
-    if (!anchor) return null;
+    let anchor = localStorage.getItem('trackit_block_anchor');
+    if (!anchor) {
+      // Auto-set anchor to this Monday so block schedule works immediately
+      const now = new Date();
+      const dow = now.getDay();
+      const mon = new Date(now);
+      mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+      anchor = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+      try { localStorage.setItem('trackit_block_anchor', anchor); } catch {}
+    }
 
     const target = new Date(dateKey + 'T00:00:00');
     if (target.getDay() === 0 || target.getDay() === 6) return null; // skip weekends
@@ -921,8 +933,10 @@ export default function CalendarScreen() {
 
   return (
     <Screen>
-      {/* Dark forest header — matches Today screen */}
+      {/* Dark forest header */}
       <div style={{ background: Colors.forest, padding: '22px 20px 0', flexShrink: 0 }}>
+
+        {/* Title row: Calendar label + Schedule link */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
           <div>
             <div style={{ fontSize: 27, fontWeight: 800, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1 }}>
@@ -933,24 +947,18 @@ export default function CalendarScreen() {
             </div>
           </div>
           <button
-            onClick={goToToday}
-            style={{
-              background: 'rgba(255,255,255,0.12)', border: 'none',
-              borderRadius: 8, padding: '6px 12px',
-              fontSize: 12, fontWeight: 700, color: '#fff',
-              cursor: 'pointer', fontFamily: 'inherit',
-              letterSpacing: '0.02em',
-            }}
+            onClick={() => navigate('schedule')}
+            style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.02em' }}
           >
-            Today
+            Edit schedule
           </button>
         </div>
 
-        {/* Week/Month toggle + chevrons — inside header */}
+        {/* Today | Week | Month tabs + chevrons */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 }}>
           <button
             onClick={prevPeriod}
-            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.7)' }}
+            style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
             <IconChevronLeft size={18} color="rgba(255,255,255,0.7)" />
           </button>
@@ -959,7 +967,7 @@ export default function CalendarScreen() {
             {(['day', 'week', 'month'] as const).map(mode => (
               <button
                 key={mode}
-                onClick={() => { setViewMode(mode); setSelectedKey(null); }}
+                onClick={() => { setViewMode(mode); setSelectedKey(null); if (mode === 'day') goToToday(); }}
                 style={{
                   padding: '5px 14px', borderRadius: 7, border: 'none',
                   background: viewMode === mode ? '#fff' : 'transparent',
@@ -969,10 +977,9 @@ export default function CalendarScreen() {
                   transition: 'all 0.15s',
                 }}
               >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                {mode === 'day' ? 'Today' : mode.charAt(0).toUpperCase() + mode.slice(1)}
               </button>
-            ))}
-          </div>
+            ))}          </div>
 
           <button
             onClick={nextPeriod}
@@ -1006,7 +1013,7 @@ export default function CalendarScreen() {
               byDate={byDate}
               allAssignments={assignments}
               selectedKey={selectedKey}
-              onSelectDay={(key) => { setSelectedKey(key); setDayKey(key); }}
+              onSelectDay={(key) => { setSelectedKey(key); setDayKey(key); setViewMode('day'); }}
               onNavigate={navigate}
               dayOverrides={dayOverrides}
               setOverride={setOverride}
@@ -1019,7 +1026,7 @@ export default function CalendarScreen() {
               byDate={byDate}
               allAssignments={assignments}
               selectedKey={selectedKey}
-              onSelectDay={(key) => { setSelectedKey(key); setDayKey(key); }}
+              onSelectDay={(key) => { setSelectedKey(key); setDayKey(key); setViewMode('day'); }}
               onNavigate={navigate}
             />
           )}

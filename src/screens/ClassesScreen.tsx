@@ -115,6 +115,7 @@ export default function ClassesScreen() {
   }
   const [newName,       setNewName]       = useState('');
   const [newTeacher,    setNewTeacher]    = useState('');
+  const [newRoom,       setNewRoom]       = useState('');
   const [selectedColor, setSelectedColor] = useState<string>(CLASS_COLORS[0]);
   const [selectedClass, setSelectedClass] = useState<Course | null>(null);
   const [showDone,      setShowDone]      = useState(false);
@@ -122,12 +123,13 @@ export default function ClassesScreen() {
   const [editingClass,  setEditingClass]  = useState(false);
   const [editName,      setEditName]      = useState('');
   const [editTeacher,   setEditTeacher]   = useState('');
+  const [editRoom,      setEditRoom]      = useState('');
   const [editColor,     setEditColor]     = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   function startEdit(c: Course, e: React.MouseEvent) {
     e.stopPropagation();
-    setEditingId(c.id); setEditName(c.name); setEditColor(c.color); setEditTeacher(c.teacherName ?? '');
+    setEditingId(c.id); setEditName(c.name); setEditColor(c.color); setEditTeacher(c.teacherName ?? ''); setEditRoom(c.room ?? '');
   }
   function saveEdit() {
     if (!editName.trim() || !editingId) return;
@@ -140,7 +142,7 @@ export default function ClassesScreen() {
       ) ? { ...a, className: editName.trim(), classColor: editColor } : a
     );
     const updated = courses.map(c => c.id === editingId
-      ? { ...c, name: editName.trim(), color: editColor, teacherName: editTeacher.trim() }
+      ? { ...c, name: editName.trim(), color: editColor, teacherName: editTeacher.trim(), room: editRoom.trim() }
       : c
     );
     updateCourses(updated);
@@ -153,8 +155,8 @@ export default function ClassesScreen() {
 
   function addCourse() {
     if (!newName.trim()) return;
-    updateCourses([...courses, { id: uid(), name: newName.trim(), color: selectedColor, teacherName: newTeacher.trim() }]);
-    setNewName(''); setNewTeacher(''); setAdding(false);
+    updateCourses([...courses, { id: uid(), name: newName.trim(), color: selectedColor, teacherName: newTeacher.trim(), room: newRoom.trim() }]);
+    setNewName(''); setNewTeacher(''); setNewRoom(''); setAdding(false);
   }
   function deleteCourse(id: string) { setConfirmDeleteId(id); }
   function confirmDeleteCourse() {
