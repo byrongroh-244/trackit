@@ -150,6 +150,62 @@ function SettingsSectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ── Accessible toggle switch ──────────────────────────────────────────────────
+// Visual: 52×32px pill. Minimum touch target: 44×44px via padding on the button.
+// WCAG 2.5.5 requires 44×44px target; the padding expands the interactive area
+// without changing the visible size.
+function Toggle({ on, onChange, label, disabled = false }: {
+  on: boolean;
+  onChange?: () => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={disabled ? undefined : onChange}
+      style={{
+        // Padding expands touch target to 44px tall without changing visual size
+        padding: '6px 0',
+        background: 'none',
+        border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        // Ensure minimum 44px wide touch target
+        minWidth: 52,
+        minHeight: 44,
+        justifyContent: 'center',
+        opacity: disabled ? 0.45 : 1,
+      }}
+    >
+      {/* Visual pill */}
+      <div style={{
+        width: 52, height: 32, borderRadius: 16,
+        background: on && !disabled ? Colors.forest : Colors.grayLight,
+        position: 'relative',
+        transition: 'background 0.2s',
+        outline: 'none',
+      }}>
+        {/* Thumb */}
+        <div style={{
+          position: 'absolute',
+          top: 4,
+          left: on ? 24 : 4,
+          width: 24, height: 24,
+          borderRadius: '50%',
+          background: '#fff',
+          transition: 'left 0.2s',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+        }} />
+      </div>
+    </button>
+  );
+}
+
 export default function SettingsScreen() {
   const { navigate, reset, settings, updateSettings, signOut, userEmail, courses, updateCourses, upsertAssignments } = useApp();
 
@@ -346,31 +402,40 @@ export default function SettingsScreen() {
           {/* ── AI features ── */}
           <SettingsSectionLabel>AI features</SettingsSectionLabel>
           <Card>
-            <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            {/* Micro-steps on/off — fully functional */}
+            <div style={{ padding: '16px 18px', borderBottom: '0.5px solid #E3EBEA', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary }}>AI micro-steps</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary }}>Micro-steps</div>
                 <div style={{ fontSize: 12, color: Colors.textHint, marginTop: 2, lineHeight: 1.5 }}>
-                  Automatically break assignments into small steps
+                  Break assignments into small actionable steps using the built-in library
                 </div>
               </div>
-              <button
-                onClick={() => updateSettings({ ...settings, microstepsEnabled: !(settings.microstepsEnabled !== false) })}
-                style={{
-                  width: 48, height: 28, borderRadius: 14,
-                  background: settings.microstepsEnabled !== false ? Colors.forest : Colors.grayLight,
-                  border: 'none', cursor: 'pointer', position: 'relative',
-                  transition: 'background 0.2s', flexShrink: 0,
-                }}
-              >
-                <div style={{
-                  position: 'absolute', top: 3,
-                  left: settings.microstepsEnabled !== false ? 22 : 3,
-                  width: 22, height: 22, borderRadius: '50%',
-                  background: '#fff',
-                  transition: 'left 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                }} />
-              </button>
+              <Toggle
+                on={settings.microstepsEnabled !== false}
+                onChange={() => updateSettings({ ...settings, microstepsEnabled: !(settings.microstepsEnabled !== false) })}
+                label="Toggle micro-steps"
+              />
+            </div>
+
+            {/* AI micro-steps — locked off for beta */}
+            <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary }}>AI-generated steps</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: Colors.amber, background: Colors.amberLight, borderRadius: 6, padding: '2px 7px', letterSpacing: '0.04em' }}>BETA</span>
+                </div>
+                <div style={{ fontSize: 12, color: Colors.textHint, marginTop: 2, lineHeight: 1.5 }}>
+                  Use AI to generate steps for assignments the library doesn't recognise
+                </div>
+                <div style={{ fontSize: 11, color: Colors.textHint, marginTop: 4, fontStyle: 'italic' }}>
+                  Coming soon — not available in this version
+                </div>
+              </div>
+              <Toggle
+                on={false}
+                label="AI steps — not available in this version"
+                disabled
+              />
             </div>
           </Card>
 

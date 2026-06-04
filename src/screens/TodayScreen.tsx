@@ -43,7 +43,7 @@ function dateKeyOffset(n: number): string {
 }
 
 export default function TodayScreen() {
-  const { assignments, navigate, patchAssignment, settings } = useApp();
+  const { assignments, navigate, patchAssignment, settings, loading } = useApp();
   const [showDone,     setShowDone]     = useState(false);
   const [collapsed,    setCollapsed]    = useState<Record<Section, boolean>>(readCollapsed);
   const [completingId, setCompletingId] = useState<string | null>(null);
@@ -348,7 +348,14 @@ export default function TodayScreen() {
         <div style={{ paddingTop: 0 }}>
 
         {/* ── Main list ── */}
-        {assignments.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ borderRadius: 16, background: '#F0F4F3', height: 80, animation: 'pulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
+            ))}
+            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+          </div>
+        ) : assignments.length === 0 ? (
           <EmptyState icon={<IconCircleCheck size={48} color={Colors.teal} />} title="All clear!" body="No assignments yet. Tap Add to get started." />
         ) : active.length === 0 && hiddenCount === 0 && done.length === 0 ? (
           <EmptyState icon={<IconCircleCheck size={48} color={Colors.teal} />} title="All caught up!" body="Nothing due in this window." />

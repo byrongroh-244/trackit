@@ -37,8 +37,8 @@ async function canvasFetch(domain: string, token: string, path: string) {
   const authHeader = await getAuthHeader();
   const res = await fetch(CANVAS_PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': authHeader, 'apikey': authHeader.replace('Bearer ', '') },
-    body: JSON.stringify({ domain: clean, token, path }),
+    headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+    body: JSON.stringify({ domain: clean, path }),
   });
   if (!res.ok) throw new Error(`Canvas error ${res.status}`);
   const data = await res.json();
@@ -47,12 +47,14 @@ async function canvasFetch(domain: string, token: string, path: string) {
 }
 
 export default function CanvasScreen() {
-  const { courses, assignments, navigate, updateCourses, upsertAssignments, settings } = useApp();
+  const { courses, assignments, navigate, updateCourses, upsertAssignments, settings, updateSettings } = useApp();
   const { showToast } = useToast();
 
-  const [domain,       setDomain]       = useState(getCanvasDomain);
-  const [token,        setToken]        = useState(getCanvasToken);
-  const [stage,        setStage]        = useState<Stage>(getCanvasDomain() && getCanvasToken() ? 'select' : 'form');
+  const [domain,       setDomain]       = useState(settings.canvasDomain ?? getCanvasDomain());
+  const [token,        setToken]        = useState('');
+  const [stage,        setStage]        = useState<Stage>(
+    (settings.canvasDomain || getCanvasDomain()) && (settings.canvasToken || getCanvasToken()) ? 'select' : 'form'
+  );
   const [error,        setError]        = useState('');
   const [allCourses,   setAllCourses]   = useState<CanvasCourse[]>([]);
   const [selected,     setSelected]     = useState<Set<number>>(new Set());
@@ -63,8 +65,8 @@ export default function CanvasScreen() {
 
   // If already connected, jump to select
   useEffect(() => {
-    const d = getCanvasDomain();
-    const t = getCanvasToken();
+    const d = settings.canvasDomain ?? getCanvasDomain();
+    const t = settings.canvasToken  ?? getCanvasToken();
     if (d && t) connect(d, t);
     // eslint-disable-next-line
   }, []);
@@ -75,7 +77,11 @@ export default function CanvasScreen() {
     setLoading(true); setError('');
     try {
       const list = await fetchCanvasCourses(d.trim(), t.trim());
-      setCanvasDomain(d.trim()); setCanvasToken(t.trim());
+      // Save domain to localStorage for display purposes only (not the token)
+      setCanvasDomain(d.trim());
+      // Save token securely to Supabase settings — remove from localStorage
+      setCanvasToken('');
+      await updateSettings({ ...settings, canvasDomain: d.trim(), canvasToken: t.trim() } as any);
       setAllCourses(list);
       // Pre-check courses already imported (matched by canvasId)
       const alreadySynced = new Set(

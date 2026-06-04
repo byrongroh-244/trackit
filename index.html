@@ -18,8 +18,14 @@
     <meta name="theme-color" content="#1c4a4f" />
 
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/trackit/icon.svg" />
+    <link rel="apple-touch-icon" href="/trackit/icon.svg" />
+
+    <!-- Security headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob:; worker-src blob:; frame-ancestors 'none';" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>

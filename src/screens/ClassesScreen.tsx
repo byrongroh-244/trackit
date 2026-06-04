@@ -56,8 +56,8 @@ export default function ClassesScreen() {
       async function canvasFetch(path: string) {
         const res = await fetch(CANVAS_PROXY_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': authHeader, 'apikey': authHeader.replace('Bearer ', '') },
-          body: JSON.stringify({ domain: clean, token: canvasToken, path }),
+          headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+          body: JSON.stringify({ domain: clean, path }),
         });
         if (!res.ok) throw new Error(`Canvas error ${res.status}`);
         const data = await res.json();

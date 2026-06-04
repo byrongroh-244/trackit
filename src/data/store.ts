@@ -50,7 +50,10 @@ export interface AppSettings {
   currentSemester: string;
   onboardingComplete: boolean;
   microstepsEnabled: boolean;
+  microstepsAI:      boolean;  // AI-generated steps — locked off for beta
   termsAccepted: boolean;
+  canvasDomain?: string;
+  canvasToken?: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -61,7 +64,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   currentSemester: 'fall',
   onboardingComplete: false,
   microstepsEnabled: true,
+  microstepsAI:      false,  // locked off for beta
   termsAccepted: false,
+  canvasDomain: undefined,
+  canvasToken: undefined,
 };
 
 export function loadSettings(): AppSettings {
@@ -273,7 +279,8 @@ async function canvasFetch(domain: string, token: string, path: string): Promise
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${sessionToken}`,
     },
-    body: JSON.stringify({ domain: clean, token, path }),
+    // Token is no longer sent from client — canvas-proxy reads it server-side from settings
+    body: JSON.stringify({ domain: clean, path }),
   });
   if (!res.ok) throw new Error(`Canvas returned ${res.status}. Check your URL and token.`);
   const data = await res.json();

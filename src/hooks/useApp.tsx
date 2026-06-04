@@ -95,7 +95,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [{ data: cData }, { data: aData }, { data: sData }] = await Promise.all([
       supabase.from('courses').select('id, name, color, description, teacher_name, room, canvas_name, canvas_id, created_at').eq('user_id', uid).order('created_at'),
       supabase.from('assignments').select('id, name, class_id, class_name, class_color, due_date, done, notes, type, subtasks, effort, weight, communications, created_at').eq('user_id', uid).order('created_at'),
-      supabase.from('settings').select('user_id, agenda_lookahead_days, focus_work_minutes, focus_break_minutes, grade_level, current_semester, onboarding_complete, microsteps_enabled, terms_accepted').eq('user_id', uid).maybeSingle(),
+      supabase.from('settings').select('user_id, agenda_lookahead_days, focus_work_minutes, focus_break_minutes, grade_level, current_semester, onboarding_complete, microsteps_enabled, microsteps_ai, terms_accepted, canvas_domain, canvas_token').eq('user_id', uid).maybeSingle(),
     ]);
     if (cData) setCourses(cData.map(fromDbCourse));
     if (aData) {
@@ -116,7 +116,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentSemester:      sData.current_semester        ?? 'fall',
         onboardingComplete:   sData.onboarding_complete     ?? false,
         microstepsEnabled:    sData.microsteps_enabled       ?? true,
-        termsAccepted:        sData.terms_accepted           ?? false,
+        microstepsAI:         sData.microsteps_ai             ?? false,
+        termsAccepted:        sData.terms_accepted            ?? false,
+        canvasDomain:         sData.canvas_domain            ?? undefined,
+        canvasToken:          sData.canvas_token             ?? undefined,
       };
       setSettings(s);
       saveSettings(s);
@@ -281,8 +284,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── patchAssignment ────────────────────────────────────────────────────────
   // Single-record update — always targeted, never writes the full array.
+  // Optimistically updates local state, rolls back on Supabase error.
   const patchAssignment = useCallback(async (updated: Assignment) => {
-    setAssignments(prev => prev.map(a => a.id === updated.id ? updated : a));
+    // Save previous state for rollback
+    let previous: Assignment | undefined;
+    setAssignments(prev => {
+      previous = prev.find(a => a.id === updated.id);
+      return prev.map(a => a.id === updated.id ? updated : a);
+    });
 
     const uid = userIdRef.current;
     if (!uid) return;
@@ -291,7 +300,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('assignments')
       .upsert(toDbAssignment(updated, uid));
 
-    if (error) { console.error("patchAssignment:", error); setWriteError("Failed to update assignment. Check your connection and try again."); }
+    if (error) {
+      console.error('patchAssignment:', error);
+      // Roll back to previous state
+      if (previous) setAssignments(prev => prev.map(a => a.id === updated.id ? previous! : a));
+      setWriteError('Failed to update assignment. Check your connection and try again.');
+    }
   }, []);
 
   // ── deleteAssignment ───────────────────────────────────────────────────────
@@ -322,7 +336,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       current_semester:      s.currentSemester,
       onboarding_complete:   s.onboardingComplete,
       microsteps_enabled:    s.microstepsEnabled ?? true,
+      microsteps_ai:         s.microstepsAI      ?? false,
       terms_accepted:        s.termsAccepted     ?? false,
+      ...(s.canvasDomain !== undefined ? { canvas_domain: s.canvasDomain } : {}),
+      ...(s.canvasToken  !== undefined ? { canvas_token:  s.canvasToken  } : {}),
     }, { onConflict: 'user_id' });
 
     if (error) console.error('updateSettings error:', error);

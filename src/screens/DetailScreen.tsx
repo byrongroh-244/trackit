@@ -21,7 +21,8 @@ const EditIcon = () => (
 export default function DetailScreen() {
   const { assignments, courses, detailId, navigate, patchAssignment, deleteAssignment, settings } = useApp();
   const { showToast } = useToast();
-  const microsteps  = settings.microstepsEnabled !== false;
+  const microsteps   = settings.microstepsEnabled !== false;
+  const microstepsAI = settings.microstepsAI === true;
   const assignment  = assignments.find(a => a.id === detailId);
 
   const [editingDateId,       setEditingDateId]       = useState<string | null>(null);
@@ -55,8 +56,7 @@ export default function DetailScreen() {
   // was available), generate them now and patch silently.
   // AbortController cancels any in-flight call when the user navigates away.
   useEffect(() => {
-    if (!assignment || assignment.subtasks.length > 0 || generatingSteps || assignment.type === 'task') return;
-    // Never attempt AI generation more than once per assignment — if subtasks
+    if (!assignment || assignment.subtasks.length > 0 || generatingSteps || assignment.type === 'task' || !microsteps) return;    // Never attempt AI generation more than once per assignment — if subtasks
     // are still empty after a previous attempt it means we already tried and
     // got a generic fallback that wasn't saved, or the patch failed. Either
     // way, don't hammer the API on every open.
@@ -67,7 +67,7 @@ export default function DetailScreen() {
     let cancelled = false;
     setGeneratingSteps(true);
 
-    generateSubtasks(assignment.name, assignment.dueDate, '', assignment.effort ?? null, microsteps)
+    generateSubtasks(assignment.name, assignment.dueDate, '', assignment.effort ?? null, microstepsAI)
       .then(subtasks => {
         if (!cancelled) patchAssignment({ ...assignment, subtasks });
       })
