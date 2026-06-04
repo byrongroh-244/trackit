@@ -218,8 +218,6 @@ export default function SettingsScreen() {
         localStorage.removeItem(HIGHLIGHT_KEY);
         setTimeout(() => setHighlight(false), 3000);
       }
-      if (schedFlag === '1') {
-      }
     } catch {}
   }, []);
 
