@@ -34,7 +34,11 @@ export default function AuthScreen({ onAuth }: { onAuth: () => void }) {
       if (error) { setStatus('error'); setMessage(error.message); }
       else { setStatus('success'); /* auth state update handled by onAuthStateChange in useApp */ }
     } else if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { emailRedirectTo: 'https://byrongroh-244.github.io/trackit' },
+      });
       if (error) { setStatus('error'); setMessage(error.message); }
       else {
         setStatus('success');
@@ -42,7 +46,9 @@ export default function AuthScreen({ onAuth }: { onAuth: () => void }) {
         setMode('login'); setPassword('');
       }
     } else if (mode === 'forgot') {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'https://byrongroh-244.github.io/trackit',
+      });
       if (error) { setStatus('error'); setMessage(error.message); }
       else { setStatus('success'); setMessage('Password reset email sent. Check your inbox.'); }
     }
