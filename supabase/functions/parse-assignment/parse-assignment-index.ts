@@ -2,10 +2,31 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') ?? 'https://byrongroh-244.github.io';
 
+// Per-user daily limits — subtask calls are cheap (haiku), vision is expensive
+const DAILY_SUBTASK_LIMIT = 50;
+const DAILY_VISION_LIMIT  = 10;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+async function checkRateLimit(userId: string, mode: string): Promise<{ allowed: boolean; remaining: number }> {
+  try {
+    const kv      = await Deno.openKv();
+    const limit   = mode === 'vision' ? DAILY_VISION_LIMIT : DAILY_SUBTASK_LIMIT;
+    const today   = new Date().toISOString().split('T')[0];
+    const key     = ['rate', userId, mode, today];
+    const entry   = await kv.get<number>(key);
+    const count   = entry.value ?? 0;
+    if (count >= limit) return { allowed: false, remaining: 0 };
+    await kv.set(key, count + 1, { expireIn: 86_400_000 }); // expire after 24h
+    return { allowed: true, remaining: limit - count - 1 };
+  } catch {
+    // If KV fails, allow the request — don't block users due to infra issues
+    return { allowed: true, remaining: -1 };
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,6 +56,14 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const { mode, today } = body;
+
+    // Rate limit check
+    const { allowed, remaining } = await checkRateLimit(user.id, mode ?? 'subtasks');
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Daily limit reached. Try again tomorrow.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-RateLimit-Remaining': '0' },
+      });
+    }
 
     // ── Mode: vision — parse image or PDF via Claude vision ──────────────────
     if (mode === 'vision' || mode === 'pdf') {

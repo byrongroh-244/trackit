@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { NAV } from '../data/nav';
 import { useApp } from '../hooks/useApp';
 import { uid, generateSubtasks, inferType } from '../data/store';
 import { Colors } from '../theme';
@@ -15,13 +16,6 @@ export interface ParsedItem {
   name: string; dueDate: string; type: AssignmentType; selected: boolean;
 }
 
-const NAV = [
-  { label: 'Agenda',   icon: '', screen: 'today'    },
-  { label: 'Calendar', icon: '', screen: 'calendar' },
-  { label: 'Add',      icon: '', screen: 'add'      },
-  { label: 'Classes',  icon: '', screen: 'classes'  },
-  { label: 'Settings', icon: '', screen: 'settings' },
-];
 
 
 // ── Shared SubHeader ──────────────────────────────────────────────────────────

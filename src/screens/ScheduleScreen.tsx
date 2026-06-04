@@ -5,15 +5,13 @@ import { Colors, CLASS_COLORS } from '../theme';
 import { Screen, ScrollBody } from '../components/UI';
 import { IconArrowLeft } from '../components/Icons';
 import PeriodEditor from '../components/PeriodEditor';
-import type { ClassPeriod } from './CalendarScreen';
-
-const SCHEDULE_KEY   = 'trackit_class_schedule';
-const SCHED_TYPE_KEY = 'trackit_schedule_type';
-
-function load<T>(key: string, fallback: T): T {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
-}
-function save(key: string, val: any) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+import type { ClassPeriod } from './calendar/calendarUtils';
+import {
+  getSchedule, setSchedule,
+  getScheduleType, setScheduleType,
+  getAdjustedDays, setAdjustedDays,
+  getOrCreateBlockAnchor,
+} from '../data/scheduleStorage';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_SHORT  = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -34,40 +32,37 @@ function toH(sh: number, sm: number, eh: number, em: number) {
 export default function ScheduleScreen() {
   const { courses, navigate, updateCourses } = useApp();
 
-  const [scheduleType, setScheduleType] = useState<'standard' | 'block'>(() =>
-    ((localStorage.getItem(SCHED_TYPE_KEY) as 'standard' | 'block') || 'standard')
-  );
+  const [scheduleType,  setSchedType]   = useState<'standard' | 'block'>(() => getScheduleType());
+  const [adjDays,       setAdjDaysState] = useState<{ label: string }[]>(() => getAdjustedDays());
+  const [showAltEditor, setShowAltEditor] = useState(false);
+  const [adjLabel,      setAdjLabel]     = useState('');
 
-  // Read adjusted days from settings
-  const adjDays: { label: string }[] = (() => {
-    try { return JSON.parse(localStorage.getItem('trackit_adjusted_days') ?? '[]'); } catch { return []; }
-  })();
-  const [periods,      setPeriods]      = useState<ClassPeriod[]>(() => load(SCHEDULE_KEY, []));
+  function saveAdjDays(updated: { label: string }[]) {
+    setAdjDaysState(updated);
+    setAdjustedDays(updated as any);
+  }
+
+  const DAY_NAMES_SHORT = ['Mo','Tu','We','Th','Fr'];
+  const DAY_NAMES_FULL  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+
+  const [periods,      setPeriods]      = useState<ClassPeriod[]>(() => getSchedule());
   const [editing,      setEditing]      = useState<ClassPeriod | null>(null);
   const [showEditor,   setShowEditor]   = useState(false);
   const [viewDay,      setViewDay]      = useState<number>(
     () => { const d = new Date().getDay(); return d === 0 || d === 6 ? 1 : d; }
   );
+  const [previewWeek,  setPreviewWeek]  = useState<1 | 2>(1);
   const [viewMode,     setViewMode]     = useState<'week' | 'day'>('week');
 
   function savePeriods(updated: ClassPeriod[]) {
     setPeriods(updated);
-    save(SCHEDULE_KEY, updated);
+    setSchedule(updated);
   }
 
   function saveType(t: 'standard' | 'block') {
+    setSchedType(t);
     setScheduleType(t);
-    localStorage.setItem(SCHED_TYPE_KEY, t);
-    // Auto-set block anchor to this Monday if not already set
-    if (t === 'block' && !localStorage.getItem('trackit_block_anchor')) {
-      const now = new Date();
-      const dow = now.getDay();
-      const mon = new Date(now);
-      mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
-      localStorage.setItem('trackit_block_anchor',
-        `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`
-      );
-    }
+    if (t === 'block') getOrCreateBlockAnchor();
   }
 
   function deletePeriod(p: ClassPeriod) {
@@ -101,9 +96,12 @@ export default function ScheduleScreen() {
   const DOW_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   function periodsForDow(dow: number) {
-    const previewDay = scheduleType === 'block'
-      ? ([1,3,5].includes(dow) ? 'A' : 'B')
-      : null;
+    // Week 1 = A on Mon/Wed/Fri, B on Tue/Thu
+    // Week 2 = B on Mon/Wed/Fri, A on Tue/Thu
+    const baseIsA = [1, 3, 5].includes(dow);
+    const previewDay: 'A' | 'B' = scheduleType === 'block'
+      ? (previewWeek === 1 ? (baseIsA ? 'A' : 'B') : (baseIsA ? 'B' : 'A'))
+      : 'A';
     const dowName = DOW_FULL[dow];
     const adjDay  = adjDays.find((a: { label: string }) =>
       a.label.toLowerCase().includes(dowName.toLowerCase())
@@ -164,10 +162,24 @@ export default function ScheduleScreen() {
             ))}
           </div>
 
-          {/* Alt day badge — shows if one is configured */}
-          {scheduleType === 'block' && adjDays.length > 0 && (
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
-              Alt: {adjDays[0].label}
+          {/* Alt day — tappable to manage when in block mode */}
+          {scheduleType === 'block' && (
+            <button onClick={() => setShowAltEditor(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.1)', borderRadius: 6, padding: '4px 9px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {adjDays.length > 0 ? `Alt: ${adjDays[0].label}` : 'Set alt day'}
+            </button>
+          )}
+
+          {/* Week 1 / Week 2 toggle — block only */}
+          {scheduleType === 'block' && (
+            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 2, gap: 2 }}>
+              {([1, 2] as const).map(w => (
+                <button key={w} onClick={() => setPreviewWeek(w)}
+                  style={{ padding: '5px 10px', borderRadius: 6, border: 'none', background: previewWeek === w ? '#B8E04A' : 'transparent', color: previewWeek === w ? Colors.forest : 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: previewWeek === w ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Wk {w}
+                </button>
+              ))}
             </div>
           )}
 
@@ -273,7 +285,7 @@ export default function ScheduleScreen() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: Colors.textPrimary }}>{p.name}</div>
                       <div style={{ fontSize: 12, color: Colors.textHint, marginTop: 2 }}>
-                        {p.days.map(d => DAY_LABELS[d].slice(0,3)).join(', ')} · {fmt(p.startHour, p.startMin)}–{fmt(p.endHour, p.endMin)}
+                        {p.days.map((d: number) => DAY_LABELS[d].slice(0,3)).join(', ')} · {fmt(p.startHour, p.startMin)}–{fmt(p.endHour, p.endMin)}
                         {p.blockDay ? ` · ${p.blockDay}-day` : ''}
                         {p.room ? ` · ${p.room}` : ''}
                       </div>
@@ -346,6 +358,76 @@ export default function ScheduleScreen() {
           onSave={onSave}
           onCancel={() => { setShowEditor(false); setEditing(null); }}
         />
+      )}
+      {/* Alt day editor sheet */}
+      {showAltEditor && (
+        <>
+          <div onClick={() => { setShowAltEditor(false); setAdjLabel(''); }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 101,
+            background: '#fff', borderRadius: '20px 20px 0 0',
+            padding: '20px 18px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+            maxHeight: '70vh', overflowY: 'auto',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: Colors.textPrimary, marginBottom: 4, letterSpacing: '-0.02em' }}>Alternate schedule days</div>
+            <div style={{ fontSize: 13, color: Colors.textHint, marginBottom: 16, lineHeight: 1.5 }}>
+              Days that follow the A/B rotation but with different class times — e.g. late start, early release.
+            </div>
+
+            {/* Existing alt days */}
+            {adjDays.map((d, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #E3EBEA' }}>
+                <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: Colors.textPrimary }}>{d.label}</div>
+                <button onClick={() => saveAdjDays(adjDays.filter((_, j) => j !== i))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: Colors.red }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                </button>
+              </div>
+            ))}
+
+            {/* Add new */}
+            <div style={{ marginTop: 14 }}>
+              <input
+                autoFocus
+                value={adjLabel}
+                onChange={e => setAdjLabel(e.target.value)}
+                placeholder="e.g. Late Start Wednesday"
+                style={{ width: '100%', fontSize: 14, padding: '11px 13px', borderRadius: 12, border: `1.5px solid ${Colors.forest}`, outline: 'none', fontFamily: 'inherit', color: Colors.textPrimary, background: '#fff', boxSizing: 'border-box', marginBottom: 10 }}
+              />
+              {/* Day picker */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                {DAY_NAMES_SHORT.map((day, i) => {
+                  const active = adjLabel.toLowerCase().includes(DAY_NAMES_FULL[i].toLowerCase());
+                  return (
+                    <button key={day} onClick={() => {
+                      const base = adjLabel.replace(/monday|tuesday|wednesday|thursday|friday/gi, '').trim();
+                      setAdjLabel(`${base} ${DAY_NAMES_FULL[i]}`.trim());
+                    }} style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: `1.5px solid ${active ? Colors.forest : '#E3EBEA'}`, background: active ? Colors.forest : '#fff', color: active ? '#fff' : Colors.textHint, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setShowAltEditor(false); setAdjLabel(''); }}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid #E3EBEA', background: '#fff', fontSize: 14, color: Colors.textSecondary, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Done
+                </button>
+                <button
+                  disabled={!adjLabel.trim()}
+                  onClick={() => {
+                    if (!adjLabel.trim()) return;
+                    saveAdjDays([...adjDays, { label: adjLabel.trim() }]);
+                    setAdjLabel('');
+                  }}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: adjLabel.trim() ? Colors.forest : '#E3EBEA', color: adjLabel.trim() ? '#fff' : Colors.textHint, fontSize: 14, fontWeight: 700, cursor: adjLabel.trim() ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </Screen>
   );

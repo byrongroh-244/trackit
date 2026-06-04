@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { NAV } from '../data/nav';
 import { useApp } from '../hooks/useApp';
 import { uid, daysUntil } from '../data/store';
 import { Colors, CLASS_COLORS, SECTION_META, getSectionForDays, getSubjectIconPaths, type Section } from '../theme';
@@ -7,14 +8,8 @@ import { Screen, ScrollBody, BottomNav, SectionLabel, EmptyState, ConfirmSheet }
 import { IconClipboard, IconBook, IconCircleCheck, IconChevronDown, IconChevronUp, IconChevronRight, IconCheck, IconArrowLeft } from '../components/Icons';
 import type { Course, Assignment } from '../types';
 import { SUPABASE_ANON_KEY, CANVAS_PROXY_URL, supabase as supabaseClient } from '../lib/supabase';
+import { getCanvasDomain, getCanvasToken, getCanvasSelectedIds } from '../data/scheduleStorage';
 
-const NAV = [
-  { label: 'Agenda',   icon: '', screen: 'today'    },
-  { label: 'Calendar', icon: '', screen: 'calendar' },
-  { label: 'Add',      icon: '', screen: 'add'      },
-  { label: 'Classes',  icon: '', screen: 'classes'  },
-  { label: 'Settings', icon: '', screen: 'settings' },
-];
 
 // ── Subject icon squircle — same pattern as AssignmentCard ───────────────────
 function ClassIcon({ name, color, size = 44 }: { name: string; color: string; size?: number }) {
@@ -45,9 +40,9 @@ export default function ClassesScreen() {
   const [syncing,       setSyncing]       = useState(false);
   const [syncMsg,       setSyncMsg]       = useState('');
 
-  const canvasDomain = (() => { try { return localStorage.getItem('trackit_canvas_domain') ?? ''; } catch { return ''; } })();
-  const canvasToken  = (() => { try { return localStorage.getItem('trackit_canvas_token')  ?? ''; } catch { return ''; } })();
-  const canvasIds    = (() => { try { return JSON.parse(localStorage.getItem('trackit_canvas_selected_ids') ?? '[]') as number[]; } catch { return [] as number[]; } })();
+  const canvasDomain = getCanvasDomain();
+  const canvasToken  = getCanvasToken();
+  const canvasIds    = getCanvasSelectedIds();
   const canvasConnected = !!(canvasDomain && canvasToken);
 
   async function quickSync() {

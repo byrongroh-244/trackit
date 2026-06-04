@@ -6,18 +6,16 @@ import { Screen, ScrollBody, useToast } from '../components/UI';
 import { IconCircleCheck, IconArrowLeft } from '../components/Icons';
 import type { Course, Assignment } from '../types';
 import { supabase, CANVAS_PROXY_URL } from '../lib/supabase';
+import { getCanvasDomain, setCanvasDomain, getCanvasToken, setCanvasToken, getCanvasSelectedIds, setCanvasSelectedIds } from '../data/scheduleStorage';
 
 async function getAuthHeader(): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.access_token ? `Bearer ${session.access_token}` : '';
 }
 
-const DOMAIN_KEY = 'trackit_canvas_domain';
-const TOKEN_KEY  = 'trackit_canvas_token';
 
-function lsGet(k: string) { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } }
-function lsSet(k: string, v: string) { try { localStorage.setItem(k, v); } catch {} }
-function lsDel(k: string) { try { localStorage.removeItem(k); } catch {} }
+
+
 
 // ── Stages ──────────────────────────────────────────────────────────────────
 // form → connect credentials
@@ -52,9 +50,9 @@ export default function CanvasScreen() {
   const { courses, assignments, navigate, updateCourses, upsertAssignments, settings } = useApp();
   const { showToast } = useToast();
 
-  const [domain,       setDomain]       = useState(lsGet(DOMAIN_KEY));
-  const [token,        setToken]        = useState(lsGet(TOKEN_KEY));
-  const [stage,        setStage]        = useState<Stage>(lsGet(DOMAIN_KEY) && lsGet(TOKEN_KEY) ? 'select' : 'form');
+  const [domain,       setDomain]       = useState(getCanvasDomain);
+  const [token,        setToken]        = useState(getCanvasToken);
+  const [stage,        setStage]        = useState<Stage>(getCanvasDomain() && getCanvasToken() ? 'select' : 'form');
   const [error,        setError]        = useState('');
   const [allCourses,   setAllCourses]   = useState<CanvasCourse[]>([]);
   const [selected,     setSelected]     = useState<Set<number>>(new Set());
@@ -65,8 +63,8 @@ export default function CanvasScreen() {
 
   // If already connected, jump to select
   useEffect(() => {
-    const d = lsGet(DOMAIN_KEY);
-    const t = lsGet(TOKEN_KEY);
+    const d = getCanvasDomain();
+    const t = getCanvasToken();
     if (d && t) connect(d, t);
     // eslint-disable-next-line
   }, []);
@@ -77,7 +75,7 @@ export default function CanvasScreen() {
     setLoading(true); setError('');
     try {
       const list = await fetchCanvasCourses(d.trim(), t.trim());
-      lsSet(DOMAIN_KEY, d.trim()); lsSet(TOKEN_KEY, t.trim());
+      setCanvasDomain(d.trim()); setCanvasToken(t.trim());
       setAllCourses(list);
       // Pre-check courses already imported (matched by canvasId)
       const alreadySynced = new Set(
@@ -198,7 +196,7 @@ export default function CanvasScreen() {
   }
 
   function disconnect() {
-    lsDel(DOMAIN_KEY); lsDel(TOKEN_KEY);
+    setCanvasDomain(''); setCanvasToken('');
     setDomain(''); setToken(''); setAllCourses([]); setSelected(new Set());
     setStage('form');
   }

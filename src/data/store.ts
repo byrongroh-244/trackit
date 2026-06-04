@@ -167,7 +167,13 @@ function shortLabel(name: string): string {
     .slice(0, 40);
 }
 
-export async function generateSubtasks(name: string, dueDate: string, gradeLevel = '', effort: 'quick' | 'medium' | 'long' | null = null): Promise<Subtask[]> {
+export async function generateSubtasks(
+  name: string,
+  dueDate: string,
+  gradeLevel = '',
+  effort: 'quick' | 'medium' | 'long' | null = null,
+  useAI = false,   // ← must be explicitly opted in; off by default
+): Promise<Subtask[]> {
   const l     = name.toLowerCase();
   const label = shortLabel(name);
   const grade = gradeCategory(gradeLevel);
@@ -212,29 +218,31 @@ export async function generateSubtasks(name: string, dueDate: string, gradeLevel
     steps = [];
   }
 
-  // ── Fallback: try AI, then generic ─────────────────────────────────────────
+  // ── Fallback: try AI (only if enabled), then generic ──────────────────────
   if (!steps.length) {
-    try {
-      const controller = new AbortController();
-      const timeout    = setTimeout(() => controller.abort(), 5000);
-      const token = await getSessionToken();
-      const res = await fetch(AI_FUNCTION_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body:    JSON.stringify({ mode: 'subtasks', assignmentName: name, dueDate, gradeLevel }),
-        signal:  controller.signal,
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.steps) && data.steps.length > 0) {
-          steps = data.steps as string[];
+    if (useAI) {
+      try {
+        const controller = new AbortController();
+        const timeout    = setTimeout(() => controller.abort(), 5000);
+        const token = await getSessionToken();
+        const res = await fetch(AI_FUNCTION_URL, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body:    JSON.stringify({ mode: 'subtasks', assignmentName: name, dueDate, gradeLevel }),
+          signal:  controller.signal,
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.steps) && data.steps.length > 0) {
+            steps = data.steps as string[];
+          }
         }
+      } catch {
+        // Network error or timeout — fall through to generic
       }
-    } catch {
-      // Network error or timeout — fall through to generic
     }
-    // Generic fallback if AI also fails or returns nothing
+    // Generic fallback when library misses and AI is off (or AI also fails)
     if (!steps.length) {
       steps = [
         `Review the requirements for "${label}"`,

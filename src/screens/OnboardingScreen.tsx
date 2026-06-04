@@ -4,6 +4,7 @@ import { uid } from '../data/store';
 import { Colors, CLASS_COLORS } from '../theme';
 import type { Course } from '../types';
 import { IconChevronRight, IconCheck, IconX } from '../components/Icons';
+import { setScheduleType, setBlockAnchor, getBlockAnchor, setSchedule, setAdjustedDays } from '../data/scheduleStorage';
 
 type Step =
   | 'features'
@@ -244,28 +245,23 @@ export default function OnboardingScreen({ isNewSemester = false, onComplete }: 
   }
 
   function saveScheduleToStorage() {
-    try {
-      localStorage.setItem('trackit_schedule_type', schedType || 'standard');
-      // Save school day start as block anchor week
-      if (schedType === 'block') {
-        const now = new Date();
-        const dow = now.getDay();
-        const mon = new Date(now);
-        mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
-        const key = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
-        if (!localStorage.getItem('trackit_block_anchor')) localStorage.setItem('trackit_block_anchor', key);
-      }
-      // Build class periods from class times
-      const periods = newCourses
-        .filter(c => classTimes[c.id])
-        .map(c => {
-          const t = classTimes[c.id];
-          return { name: c.name, color: c.color, days: [1,2,3,4,5], startHour: t.startH, startMin: t.startM, endHour: t.endH, endMin: t.endM, blockDay: null };
-        });
-      if (periods.length > 0) localStorage.setItem('trackit_class_schedule', JSON.stringify(periods));
-      // Store adjusted days
-      if (adjDays.length > 0) localStorage.setItem('trackit_adjusted_days', JSON.stringify(adjDays));
-    } catch {}
+    setScheduleType(schedType || 'standard');
+    if (schedType === 'block' && !getBlockAnchor()) {
+      const now = new Date();
+      const dow = now.getDay();
+      const mon = new Date(now);
+      mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+      const key = `${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,'0')}-${String(mon.getDate()).padStart(2,'0')}`;
+      setBlockAnchor(key);
+    }
+    const periods = newCourses
+      .filter(c => classTimes[c.id])
+      .map(c => {
+        const t = classTimes[c.id];
+        return { name: c.name, color: c.color, days: [1,2,3,4,5], startHour: t.startH, startMin: t.startM, endHour: t.endH, endMin: t.endM, blockDay: null };
+      });
+    if (periods.length > 0) setSchedule(periods as any);
+    if (adjDays.length > 0) setAdjustedDays(adjDays);
   }
 
   async function finish(goTo?: 'add' | 'canvas') {

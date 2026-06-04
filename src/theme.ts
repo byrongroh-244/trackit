@@ -6,83 +6,108 @@ export type { Section };
 // Each entry is { path: SVG path data, viewBox? }
 const SUBJECT_ICON_MAP: { keywords: string[]; paths: string[] }[] = [
   {
-    keywords: ['calc', 'math', 'algebra', 'geometry', 'statistics', 'stat', 'pre-calc', 'precalc', 'trig'],
+    // Math — four operators on a grid with center dividers
+    keywords: ['calc', 'math', 'algebra', 'geometry', 'statistics', 'stat', 'pre-calc', 'precalc', 'trig', 'calculus'],
     paths: [
-      'M4 2h16a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
-      'M8 6h8', 'M8 10h8', 'M8 14h3', 'M8 18h3', 'M15 14h1', 'M15 18h1',
+      'M10 1 L10 21',
+      'M1 11 L21 11',
+      'M3 4 L8 4', 'M5.5 1.5 L5.5 6.5',
+      'M14 4 L19 4',
+      'M3 15 L7 19', 'M7 15 L3 19',
+      'M14 16.5 L19 16.5',
+      'M16.5 13.5 L16.5 14.5',
+      'M16.5 18.5 L16.5 19.5',
     ],
   },
   {
-    keywords: ['bio', 'science', 'chem', 'physics', 'lab', 'anatomy', 'environ'],
+    // Science — flask with liquid wave and bubble
+    keywords: ['bio', 'science', 'chem', 'physics', 'lab', 'anatomy', 'environ', 'biology', 'chemistry'],
     paths: [
-      'M6 21h12', 'M9 21v-5', 'M15 21v-5',
-      'M9 8H5a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-4',
-      'M9 8V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3',
-      'M12 12v.01',
+      'M7 2 L7 9 L2 18 Q1 20 3 20 L17 20 Q19 20 18 18 L13 9 L13 2',
+      'M5 2 L15 2',
+      'M4 16 Q6 14 10 15 Q14 16 16 14',
     ],
   },
   {
-    keywords: ['hist', 'social', 'gov', 'politics', 'econ', 'geography', 'civics', 'world'],
+    // History / Social — globe with lat/lon lines
+    keywords: ['hist', 'social', 'gov', 'politics', 'econ', 'geography', 'civics', 'world', 'global'],
     paths: [
-      'M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z',
-      'M16 8L2 22', 'M17.5 15H9',
+      'M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z',
+      'M12 2 L12 22',
+      'M2 12 L22 12',
+      'M4 7 Q12 5 20 7',
+      'M4 17 Q12 19 20 17',
     ],
   },
   {
-    keywords: ['english', 'essay', 'writing', 'lit', 'language arts', 'read', 'rhetoric', 'grammar'],
+    // English / Literature — document with folded corner and text lines
+    keywords: ['english', 'essay', 'writing', 'lit', 'literature', 'language arts', 'read', 'rhetoric', 'grammar', 'humanities'],
     paths: [
-      'M4 19.5A2.5 2.5 0 0 1 6.5 17H20',
-      'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
+      'M3 1 L13 1 L19 7 L19 21 L3 21 Z',
+      'M13 1 L13 7 L19 7',
+      'M6 11 L16 11',
+      'M6 14 L16 14',
+      'M6 17 L12 17',
     ],
   },
   {
-    keywords: ['spanish', 'french', 'german', 'latin', 'mandarin', 'chinese', 'japanese', 'foreign', 'lang'],
+    // Foreign language — two speech bubbles
+    keywords: ['spanish', 'french', 'german', 'latin', 'mandarin', 'chinese', 'japanese', 'foreign', 'lang', 'esl', 'asl'],
     paths: [
-      'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
-      'M9 10h6', 'M9 13h4',
+      'M1 2 Q1 0 3 0 L10 0 Q12 0 12 2 L12 7 Q12 9 10 9 L6 9 L4 12 L4 9 L3 9 Q1 9 1 7 Z',
+      'M8 11 Q8 9 10 9 L17 9 Q19 9 19 11 L19 16 Q19 18 17 18 L16 18 L16 21 L14 18 L10 18 Q8 18 8 16 Z',
     ],
   },
   {
-    keywords: ['art', 'studio', 'design', 'draw', 'paint', 'visual', 'photo', 'film', 'media'],
+    // Art — easel with canvas and horizontal line detail
+    keywords: ['art', 'studio', 'design', 'draw', 'paint', 'visual', 'photo', 'film', 'media', 'ceramics', 'sculpture', 'theater', 'drama'],
     paths: [
-      'M12 19l7-7 3 3-7 7-3-3z',
-      'M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z',
-      'M2 2l7.586 7.586', 'M11 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+      'M3 1 L17 1 L17 12 L3 12 Z',
+      'M4 12 L1 21',
+      'M16 12 L19 21',
+      'M10 12 L10 21',
+      'M3 17 L17 17',
+      'M6 7 L14 7',
     ],
   },
   {
-    keywords: ['music', 'band', 'choir', 'orchestra', 'theory'],
+    // Music — eighth note (oval head + stem + flag, all stroke)
+    keywords: ['music', 'band', 'choir', 'orchestra', 'theory', 'chorus'],
     paths: [
-      'M9 18V5l12-2v13',
-      'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
-      'M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+      'M9.5 17 Q6 18 5.5 16 Q5 14 9 13.5 Q13 13 13 15 Q13 17 9.5 17 Z',
+      'M13 15 L13 3',
+      'M13 3 Q19 5 17 10 Q14 8 13 9',
     ],
   },
   {
-    keywords: ['pe', 'gym', 'phys ed', 'health', 'sport', 'athletic'],
+    // Health / PE — heart with pulse line
+    keywords: ['pe', 'gym', 'phys ed', 'health', 'sport', 'athletic', 'fitness', 'wellness', 'kinesiology'],
     paths: [
-      'M18 8h1a4 4 0 0 1 0 8h-1',
-      'M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z',
-      'M6 1v3', 'M10 1v3', 'M14 1v3',
+      'M10 18 Q2 12 2 7 Q2 2 6.5 2 Q8.5 2 10 5 Q11.5 2 13.5 2 Q18 2 18 7 Q18 12 10 18 Z',
+      'M3.5 9 L6 9 L7 6.5 L9.5 12 L11.5 7 L13 9 L16.5 9',
     ],
   },
   {
-    keywords: ['computer', 'cs', 'coding', 'program', 'tech', 'software', 'web', 'data'],
+    // CS / Coding — angle brackets
+    keywords: ['computer', 'cs', 'coding', 'program', 'tech', 'software', 'web', 'data', 'engineering'],
     paths: [
-      'M16 18l6-6-6-6', 'M8 6L2 12l6 6',
+      'M16 18 L22 12 L16 6',
+      'M8 6 L2 12 L8 18',
     ],
   },
   {
-    keywords: ['psychology', 'psych', 'sociology', 'anthropology'],
+    // Psychology — brain outline
+    keywords: ['psychology', 'psych', 'sociology', 'anthropology', 'philosophy', 'counseling'],
     paths: [
-      'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3',
-      'M12 17h.01',
-      'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z',
+      'M12 4 Q16 2 18 5 Q21 5 21 9 Q22 12 20 14 Q21 17 19 18 Q18 21 15 20 Q13 22 12 20 Q11 22 9 20 Q6 21 5 18 Q3 17 4 14 Q2 12 3 9 Q3 5 6 5 Q8 2 12 4 Z',
+      'M12 4 L12 20',
+      'M8 8 Q12 10 16 8',
+      'M7 13 Q12 15 17 13',
     ],
   },
 ];
 
-// Default icon (generic document) when no subject matches
+// Default icon — generic document
 const DEFAULT_ICON_PATHS = [
   'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z',
   'M14 2v6h6', 'M16 13H8', 'M16 17H8', 'M10 9H8',

@@ -428,7 +428,7 @@ const NAV_ICONS: Record<string, JSX.Element> = {
 export function BottomNav({ current, onNavigate, items }: {
   current: string;
   onNavigate: (s: string) => void;
-  items: NavItem[];
+  items: readonly NavItem[];
 }) {
   // Split items around the Add button (always center)
   const addIdx   = items.findIndex(i => i.screen === 'add');

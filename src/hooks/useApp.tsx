@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { Assignment, Course, Screen } from '../types';
 import { supabase } from '../lib/supabase';
+import { resetAllStorage } from '../data/scheduleStorage';
 import { loadSettings, saveSettings, DEFAULT_SETTINGS, type AppSettings } from '../data/store';
 
 interface AppState {
@@ -92,9 +93,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function loadData(uid: string) {
     const [{ data: cData }, { data: aData }, { data: sData }] = await Promise.all([
-      supabase.from('courses').select('*').eq('user_id', uid).order('created_at'),
-      supabase.from('assignments').select('*').eq('user_id', uid).order('created_at'),
-      supabase.from('settings').select('*').eq('user_id', uid).maybeSingle(),
+      supabase.from('courses').select('id, name, color, description, teacher_name, room, canvas_name, canvas_id, created_at').eq('user_id', uid).order('created_at'),
+      supabase.from('assignments').select('id, name, class_id, class_name, class_color, due_date, done, notes, type, subtasks, effort, weight, communications, created_at').eq('user_id', uid).order('created_at'),
+      supabase.from('settings').select('user_id, agenda_lookahead_days, focus_work_minutes, focus_break_minutes, grade_level, current_semester, onboarding_complete, microsteps_enabled, terms_accepted').eq('user_id', uid).maybeSingle(),
     ]);
     if (cData) setCourses(cData.map(fromDbCourse));
     if (aData) {
@@ -345,17 +346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Clear local state regardless — even if the DB call failed, local UI resets
     setAssignments([]); setCourses([]); setScreen('today'); setDetailId(null);
     // Clear all localStorage keys so next session starts completely fresh
-    const keysToRemove = [
-      'trackit_canvas_selected_ids',
-      'trackit_canvas_domain',
-      'trackit_canvas_token',
-      'trackit_class_schedule',
-      'trackit_schedule_type',
-      'trackit_block_anchor',
-      'trackit_day_overrides',
-      'trackit_adjusted_days',
-    ];
-    try { keysToRemove.forEach(k => localStorage.removeItem(k)); } catch {}
+    resetAllStorage();
   }, []);
 
   // ── signOut ────────────────────────────────────────────────────────────────

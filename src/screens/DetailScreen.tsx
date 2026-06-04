@@ -53,15 +53,28 @@ export default function DetailScreen() {
 
   // If the assignment loaded with no subtasks (e.g. imported before AI fallback
   // was available), generate them now and patch silently.
+  // AbortController cancels any in-flight call when the user navigates away.
   useEffect(() => {
-    if (!assignment || assignment.subtasks.length > 0 || generatingSteps || assignment.type === 'task' || !microsteps) return;
+    if (!assignment || assignment.subtasks.length > 0 || generatingSteps || assignment.type === 'task') return;
+    // Never attempt AI generation more than once per assignment — if subtasks
+    // are still empty after a previous attempt it means we already tried and
+    // got a generic fallback that wasn't saved, or the patch failed. Either
+    // way, don't hammer the API on every open.
+    const attemptedKey = `subtasks_attempted_${assignment.id}`;
+    if (sessionStorage.getItem(attemptedKey)) return;
+    sessionStorage.setItem(attemptedKey, '1');
+
+    let cancelled = false;
     setGeneratingSteps(true);
-    generateSubtasks(assignment.name, assignment.dueDate, '', assignment.effort ?? null)
+
+    generateSubtasks(assignment.name, assignment.dueDate, '', assignment.effort ?? null, microsteps)
       .then(subtasks => {
-        patchAssignment({ ...assignment, subtasks });
+        if (!cancelled) patchAssignment({ ...assignment, subtasks });
       })
-      .finally(() => setGeneratingSteps(false));
-    // Only run when detailId changes (i.e. a new assignment is opened)
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setGeneratingSteps(false); });
+
+    return () => { cancelled = true; setGeneratingSteps(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailId]);
 

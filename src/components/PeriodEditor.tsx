@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Colors } from '../theme';
+import { Colors, CLASS_COLORS } from '../theme';
 import type { Course } from '../types';
-import type { ClassPeriod } from '../screens/CalendarScreen';
+import type { ClassPeriod } from '../screens/calendar/calendarUtils';
+import { getAdjustedDays } from '../data/scheduleStorage';
 
 interface Props {
   initial:      ClassPeriod | null;
@@ -12,10 +13,7 @@ interface Props {
 }
 
 const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-// ── Native wheel time picker — triggers OS clock wheel on mobile ─────────────
-const HOURS   = Array.from({ length: 15 }, (_, i) => i + 7); // 7am–9pm
-const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const MINUTES   = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 function fmt(h: number, m: number) {
   const ampm = h >= 12 ? 'pm' : 'am';
@@ -29,57 +27,41 @@ function durLabel(sh: number, sm: number, eh: number, em: number) {
   return `${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m` : ''}`.trim();
 }
 
-const selStyle: React.CSSProperties = {
-  fontSize: 22, fontWeight: 800, color: Colors.forest,
-  background: '#fff', border: 'none', outline: 'none',
-  fontFamily: 'inherit', cursor: 'pointer',
-  letterSpacing: '-0.02em', padding: '4px 2px',
+const sel: React.CSSProperties = {
+  padding: '8px 4px', borderRadius: 10, border: '1.5px solid #E3EBEA',
+  background: '#fff', fontSize: 15, fontFamily: 'inherit',
+  color: Colors.textPrimary, textAlign: 'center',
   WebkitAppearance: 'none', appearance: 'none',
-  textAlign: 'center',
 };
 
 function TimePicker({ label, hour, minute, onChange }: {
   label: string; hour: number; minute: number;
   onChange: (h: number, m: number) => void;
 }) {
-  const isPm = hour >= 12;
-  // Clock-order hours for current AM/PM: 12, 1, 2 ... 11
-  // AM: 12(=0), 1-11 maps to 0, 1-11 (24h)
-  // PM: 12(=12), 1-11 maps to 12, 13-23 (24h)
-  const clockHours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-  function clockTo24(clockH: number, pm: boolean): number {
-    if (clockH === 12) return pm ? 12 : 0;
-    return pm ? clockH + 12 : clockH;
-  }
-  function hour24ToClock(h24: number): number {
-    if (h24 === 0) return 12;
-    if (h24 > 12) return h24 - 12;
-    return h24;
-  }
-  const clockVal = hour24ToClock(hour);
-
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h12  = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
   return (
-    <div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: Colors.textHint, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F5F7F6', borderRadius: 14, padding: '10px 16px', width: 'fit-content' }}>
-        {/* Hour — clock order 12,1,2...11 */}
-        <select value={clockVal} onChange={e => onChange(clockTo24(Number(e.target.value), isPm), minute)} style={selStyle}>
-          {clockHours.map(h => <option key={h} value={h}>{h}</option>)}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 12, color: Colors.textHint, width: 36 }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <select value={h12} onChange={e => {
+          const v = Number(e.target.value);
+          onChange(ampm === 'PM' ? (v === 12 ? 12 : v + 12) : (v === 12 ? 0 : v), minute);
+        }} style={{ ...sel, width: 52 }}>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+            <option key={h} value={h}>{h}</option>
+          ))}
         </select>
-        <span style={{ fontSize: 22, fontWeight: 800, color: Colors.forest }}>:</span>
-        {/* Minute */}
-        <select value={minute} onChange={e => onChange(hour, Number(e.target.value))} style={selStyle}>
-          {MINUTES.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
+        <span style={{ fontSize: 18, fontWeight: 800, color: Colors.forest }}>:</span>
+        <select value={minute} onChange={e => onChange(hour, Number(e.target.value))} style={{ ...sel, width: 52 }}>
+          {MINUTES.map(m => <option key={m} value={m}>{String(m).padStart(2,'0')}</option>)}
         </select>
-        {/* AM/PM */}
-        <select value={isPm ? 'pm' : 'am'} onChange={e => {
-          const pm = e.target.value === 'pm';
-          const newH = clockTo24(clockVal, pm);
-          if (newH >= 7 && newH <= 21) onChange(newH, minute);
-        }} style={{ ...selStyle, fontSize: 16, color: Colors.textSecondary }}>
-          <option value="am">am</option>
-          <option value="pm">pm</option>
+        <select value={ampm} onChange={e => {
+          if (e.target.value === 'AM' && hour >= 12) onChange(hour - 12, minute);
+          if (e.target.value === 'PM' && hour < 12)  onChange(hour + 12, minute);
+        }} style={{ ...sel, width: 56 }}>
+          <option>AM</option>
+          <option>PM</option>
         </select>
       </div>
     </div>
@@ -119,7 +101,10 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
 
   const dur     = durLabel(startH, startM, endH, endM);
   const effectiveName    = course?.name    ?? customName.trim();
-  const effectiveColor   = course?.color   ?? '#1c4a4f';
+  const effectiveColor   = course?.color   ?? (() => {
+    const used = new Set(courses.map(c => c.color));
+    return CLASS_COLORS.find(c => !used.has(c)) ?? CLASS_COLORS[courses.length % CLASS_COLORS.length];
+  })();
   const effectiveTeacher = course?.teacherName ?? customTeacher.trim();
   const effectiveRoom    = course ? (room.trim() || undefined) : (customRoom.trim() || undefined);
   const canSave = !!effectiveName && (scheduleType === 'block' || days.length > 0) && (endH * 60 + endM) > (startH * 60 + startM);
@@ -220,12 +205,8 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
 
           {/* Block rotation */}
           {scheduleType === 'block' && (() => {
-            // Load adjusted day label from onboarding (e.g. "Late Start Wednesday")
-            let adjLabel = 'Alternate day';
-            try {
-              const adj = JSON.parse(localStorage.getItem('trackit_adjusted_days') ?? '[]');
-              if (adj.length > 0) adjLabel = adj[0].label;
-            } catch {}
+            const adj = getAdjustedDays();
+            const adjLabel = adj.length > 0 ? adj[0].label : 'Alternate day';
             return (
               <div>
                 <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6 }}>Rotation day</div>
@@ -249,39 +230,41 @@ export default function PeriodEditor({ initial, courses, scheduleType, onSave, o
 
           {/* Time — two side-by-side bins */}
           <div>
-            <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10 }}>Class times</div>
+            <div style={{ fontSize:12,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10 }}>Time</div>
             <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
 
               {/* Regular day */}
               <div style={{ background:'#F5F7F6',borderRadius:14,padding:'14px 14px 10px' }}>
-                <div style={{ fontSize:11,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:10 }}>Regular</div>
-                <TimePicker label="Start" hour={startH} minute={startM} onChange={(h, m) => {
-                  setStartH(h); setStartM(m);
-                  if (h * 60 + m >= endH * 60 + endM) {
-                    const e = h * 60 + m + 50;
-                    setEndH(Math.min(21, Math.floor(e/60)));
-                    setEndM(e%60 > 55 ? 55 : Math.round((e%60)/5)*5);
-                  }
-                }} />
-                <div style={{ height:10 }} />
-                <TimePicker label="End" hour={endH} minute={endM} onChange={(h,m) => { setEndH(h); setEndM(m); }} />
-                {dur && <div style={{ fontSize:11,fontWeight:600,color:Colors.forest,marginTop:6,textAlign:'center' }}>{dur}</div>}
+                <div style={{ fontSize:11,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:12 }}>Regular</div>
+                <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
+                  <TimePicker label="Start" hour={startH} minute={startM} onChange={(h, m) => {
+                    setStartH(h); setStartM(m);
+                    if (h * 60 + m >= endH * 60 + endM) {
+                      const e = h * 60 + m + 50;
+                      setEndH(Math.min(21, Math.floor(e/60)));
+                      setEndM(e%60 > 55 ? 55 : Math.round((e%60)/5)*5);
+                    }
+                  }} />
+                  <TimePicker label="End" hour={endH} minute={endM} onChange={(h,m) => { setEndH(h); setEndM(m); }} />
+                </div>
+                {dur && <div style={{ fontSize:11,fontWeight:600,color:Colors.forest,marginTop:8 }}>{dur}</div>}
               </div>
 
               {/* Alt day (late start / early release) */}
               <div style={{ background:'#F5F7F6',borderRadius:14,padding:'14px 14px 10px' }}>
-                <div style={{ fontSize:11,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:10 }}>Alt day</div>
-                <TimePicker label="Start" hour={altStartH} minute={altStartM} onChange={(h,m) => {
-                  setAltTimesSet(true); setAltStartH(h); setAltStartM(m);
-                  if (h * 60 + m >= altEndH * 60 + altEndM) {
-                    const e = h * 60 + m + 50;
-                    setAltEndH(Math.min(21, Math.floor(e/60)));
-                    setAltEndM(e%60 > 55 ? 55 : Math.round((e%60)/5)*5);
-                  }
-                }} />
-                <div style={{ height:10 }} />
-                <TimePicker label="End" hour={altEndH} minute={altEndM} onChange={(h,m) => { setAltTimesSet(true); setAltEndH(h); setAltEndM(m); }} />
-                {(() => { const m = altEndH*60+altEndM-(altStartH*60+altStartM); if(m<=0) return null; const h=Math.floor(m/60),mn=m%60; return <div style={{ fontSize:11,fontWeight:600,color:Colors.forest,marginTop:6,textAlign:'center' }}>{`${h>0?h+'h ':''}`}{mn>0?`${mn}m`:''}</div>; })()}
+                <div style={{ fontSize:11,fontWeight:700,color:Colors.textHint,textTransform:'uppercase',letterSpacing:'.05em',marginBottom:12 }}>Alt day</div>
+                <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
+                  <TimePicker label="Start" hour={altStartH} minute={altStartM} onChange={(h,m) => {
+                    setAltTimesSet(true); setAltStartH(h); setAltStartM(m);
+                    if (h * 60 + m >= altEndH * 60 + altEndM) {
+                      const e = h * 60 + m + 50;
+                      setAltEndH(Math.min(21, Math.floor(e/60)));
+                      setAltEndM(e%60 > 55 ? 55 : Math.round((e%60)/5)*5);
+                    }
+                  }} />
+                  <TimePicker label="End" hour={altEndH} minute={altEndM} onChange={(h,m) => { setAltTimesSet(true); setAltEndH(h); setAltEndM(m); }} />
+                </div>
+                {(() => { const m = altEndH*60+altEndM-(altStartH*60+altStartM); if(m<=0) return null; const h=Math.floor(m/60),mn=m%60; return <div style={{ fontSize:11,fontWeight:600,color:Colors.forest,marginTop:8 }}>{`${h>0?h+'h ':''}`}{mn>0?`${mn}m`:''}</div>; })()}
               </div>
             </div>
           </div>

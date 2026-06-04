@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { NAV } from '../data/nav';
 import { useApp } from '../hooks/useApp';
 import { daysUntil } from '../data/store';
 import { Colors, SECTION_META, getSectionForDays, type Section } from '../theme';
@@ -8,13 +9,6 @@ import QuickLaunch from '../components/QuickLaunch';
 import { Screen, ScrollBody, BottomNav, SectionLabel, EmptyState } from '../components/UI';
 import type { Assignment } from '../types';
 
-const NAV = [
-  { label: 'Agenda',   icon: '', screen: 'today'    },
-  { label: 'Calendar', icon: '', screen: 'calendar' },
-  { label: 'Add',      icon: '', screen: 'add'      },
-  { label: 'Classes',  icon: '', screen: 'classes'  },
-  { label: 'Settings', icon: '', screen: 'settings' },
-];
 
 const COLLAPSED_KEY = 'trackit_section_collapsed';
 const AUTOFOCUS_KEY = 'trackit_autofocus';

@@ -55,6 +55,27 @@ export type Screen =
   | 'schedule'
   | 'onboarding';
 
+// ── Calendar Events ───────────────────────────────────────────────────────────
+
+export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
+export interface CalendarEvent {
+  id: string;
+  name: string;
+  startHour: number;
+  startMin:  number;
+  endHour:   number;
+  endMin:    number;
+  color:     string;
+  recurrence: EventRecurrence;
+  // anchor date for recurring events (YYYY-MM-DD)
+  anchorDate: string;
+  // optional link to a course
+  classId?:   string;
+  className?: string;
+  classColor?: string;
+}
+
 // ── Deadline Recovery System ──────────────────────────────────────────────────
 
 export type CommunicationStatus =
