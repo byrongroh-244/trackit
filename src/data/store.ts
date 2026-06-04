@@ -50,10 +50,16 @@ export interface AppSettings {
   currentSemester: string;
   onboardingComplete: boolean;
   microstepsEnabled: boolean;
-  microstepsAI:      boolean;  // AI-generated steps — locked off for beta
+  microstepsAI:      boolean;
   termsAccepted: boolean;
   canvasDomain?: string;
   canvasToken?: string;
+  scheduleData?: string;   // JSON string of ClassPeriod[]
+  scheduleType?: string;   // 'standard' | 'block'
+  adjustedDays?: string;   // JSON string of AdjustedDay[]
+  blockAnchor?:  string;   // YYYY-MM-DD anchor for A/B rotation
+  dayOverrides?: string;   // JSON string of Record<string, 'A'|'B'|'off'>
+  calendarEvents?: string; // JSON string of CalendarEvent[]
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -64,10 +70,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   currentSemester: 'fall',
   onboardingComplete: false,
   microstepsEnabled: true,
-  microstepsAI:      false,  // locked off for beta
+  microstepsAI:      false,
   termsAccepted: false,
   canvasDomain: undefined,
   canvasToken: undefined,
+  scheduleData:    undefined,
+  scheduleType:    undefined,
+  adjustedDays:    undefined,
+  blockAnchor:     undefined,
+  dayOverrides:    undefined,
+  calendarEvents:  undefined,
 };
 
 export function loadSettings(): AppSettings {

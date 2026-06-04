@@ -180,7 +180,7 @@ interface Props {
 }
 
 export default function OnboardingScreen({ isNewSemester = false, onComplete }: Props) {
-  const { updateSettings, settings, updateCourses, courses: existingCourses, navigate } = useApp();
+  const { updateSettings, settings, updateCourses, courses: existingCourses, navigate, saveScheduleToSupabase } = useApp();
 
   const [step,          setStep]          = useState<Step>(isNewSemester ? 'grade' : 'features');
   const [featureIdx,    setFeatureIdx]    = useState(0);
@@ -266,6 +266,7 @@ export default function OnboardingScreen({ isNewSemester = false, onComplete }: 
 
   async function finish(goTo?: 'add' | 'canvas') {
     saveScheduleToStorage();
+    setTimeout(() => saveScheduleToSupabase(), 0);
     await updateSettings({ ...settings, gradeLevel, currentSemester: semester, onboardingComplete: true });
     if (isNewSemester) await updateCourses([...existingCourses, ...newCourses]);
     else await updateCourses(newCourses);

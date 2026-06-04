@@ -19,7 +19,7 @@ import {
 } from '../data/scheduleStorage';
 
 export default function CalendarScreen() {
-  const { assignments, courses, navigate } = useApp();
+  const { assignments, courses, navigate, saveScheduleToSupabase } = useApp();
   const t = today();
 
   const [viewMode,    setViewMode]    = useState<'day' | 'week' | 'month'>('week');
@@ -40,6 +40,7 @@ export default function CalendarScreen() {
     setEventsState(updated);
     setCalendarEvents(updated);
     setEditingEvent(null);
+    setTimeout(() => saveScheduleToSupabase(), 0);
   }
 
   function deleteEvent(e: CalendarEvent) {
@@ -47,6 +48,7 @@ export default function CalendarScreen() {
     setEventsState(updated);
     setCalendarEvents(updated);
     setEditingEvent(null);
+    setTimeout(() => saveScheduleToSupabase(), 0);
   }
 
   function eventsForDate(dateKey: string): CalendarEvent[] {
@@ -84,6 +86,7 @@ export default function CalendarScreen() {
       setDayOverrides(next);
       return next;
     });
+    setTimeout(() => saveScheduleToSupabase(), 0);
   }
 
   // Derive A or B for any date purely from the anchor week + overrides.

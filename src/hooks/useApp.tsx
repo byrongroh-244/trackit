@@ -20,6 +20,7 @@ interface AppCtx extends AppState {
   writeError: string | null;
   clearWriteError: () => void;
   navigate: (screen: Screen, detailId?: string) => void;
+  saveScheduleToSupabase: () => Promise<void>;
   updateAssignments: (a: Assignment[], changed?: Assignment[]) => Promise<void>;
   upsertAssignments: (added: Assignment[]) => Promise<void>;
   updateCourses:     (c: Course[]) => Promise<void>;
@@ -95,7 +96,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const [{ data: cData }, { data: aData }, { data: sData }] = await Promise.all([
       supabase.from('courses').select('id, name, color, description, teacher_name, room, canvas_name, canvas_id, created_at').eq('user_id', uid).order('created_at'),
       supabase.from('assignments').select('id, name, class_id, class_name, class_color, due_date, done, notes, type, subtasks, effort, weight, communications, created_at').eq('user_id', uid).order('created_at'),
-      supabase.from('settings').select('user_id, agenda_lookahead_days, focus_work_minutes, focus_break_minutes, grade_level, current_semester, onboarding_complete, microsteps_enabled, microsteps_ai, terms_accepted, canvas_domain, canvas_token').eq('user_id', uid).maybeSingle(),
+      supabase.from('settings').select('user_id, agenda_lookahead_days, focus_work_minutes, focus_break_minutes, grade_level, current_semester, onboarding_complete, microsteps_enabled, microsteps_ai, terms_accepted, canvas_domain, canvas_token, schedule_data, schedule_type_pref, adjusted_days, block_anchor, day_overrides, calendar_events').eq('user_id', uid).maybeSingle(),
     ]);
     if (cData) setCourses(cData.map(fromDbCourse));
     if (aData) {
@@ -120,13 +121,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
         termsAccepted:        sData.terms_accepted            ?? false,
         canvasDomain:         sData.canvas_domain            ?? undefined,
         canvasToken:          sData.canvas_token             ?? undefined,
+        scheduleData:         sData.schedule_data            ?? undefined,
+        scheduleType:         sData.schedule_type_pref       ?? undefined,
+        adjustedDays:         sData.adjusted_days            ?? undefined,
+        blockAnchor:          sData.block_anchor             ?? undefined,
+        dayOverrides:         sData.day_overrides            ?? undefined,
+        calendarEvents:       sData.calendar_events          ?? undefined,
       };
       setSettings(s);
       saveSettings(s);
+      // Restore all localStorage keys from Supabase so schedule screens
+      // work correctly and data is consistent regardless of device
+      try {
+        const lsSync: Record<string, string | null> = {
+          'trackit_class_schedule':    sData.schedule_data      ?? null,
+          'trackit_schedule_type':     sData.schedule_type_pref ?? null,
+          'trackit_adjusted_days':     sData.adjusted_days      ?? null,
+          'trackit_block_anchor':      sData.block_anchor       ?? null,
+          'trackit_day_overrides':     sData.day_overrides      ?? null,
+          'trackit_calendar_events':   sData.calendar_events    ?? null,
+          'trackit_canvas_domain':     sData.canvas_domain      ?? null,
+        };
+        for (const [key, val] of Object.entries(lsSync)) {
+          if (val) localStorage.setItem(key, val);
+          else     localStorage.removeItem(key);
+        }
+      } catch {}
     } else {
-      // New user — no settings row yet. Clear any stale localStorage from
-      // a previous user on this device so onboardingComplete starts false.
-      try { localStorage.removeItem('trackit_settings'); } catch {}
+      // New user — clear everything so they start completely fresh
+      try {
+        [
+          'trackit_settings', 'trackit_class_schedule', 'trackit_schedule_type',
+          'trackit_adjusted_days', 'trackit_block_anchor', 'trackit_day_overrides',
+          'trackit_calendar_events', 'trackit_canvas_domain', 'trackit_canvas_token',
+          'trackit_canvas_selected_ids',
+        ].forEach(k => localStorage.removeItem(k));
+      } catch {}
       setSettings({ ...DEFAULT_SETTINGS });
     }
     setLoading(false);
@@ -338,12 +368,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
       microsteps_enabled:    s.microstepsEnabled ?? true,
       microsteps_ai:         s.microstepsAI      ?? false,
       terms_accepted:        s.termsAccepted     ?? false,
-      ...(s.canvasDomain !== undefined ? { canvas_domain: s.canvasDomain } : {}),
-      ...(s.canvasToken  !== undefined ? { canvas_token:  s.canvasToken  } : {}),
+      ...(s.canvasDomain    !== undefined ? { canvas_domain:      s.canvasDomain    } : {}),
+      ...(s.canvasToken     !== undefined ? { canvas_token:       s.canvasToken     } : {}),
+      ...(s.scheduleData    !== undefined ? { schedule_data:      s.scheduleData    } : {}),
+      ...(s.scheduleType    !== undefined ? { schedule_type_pref: s.scheduleType    } : {}),
+      ...(s.adjustedDays    !== undefined ? { adjusted_days:      s.adjustedDays    } : {}),
+      ...(s.blockAnchor     !== undefined ? { block_anchor:       s.blockAnchor     } : {}),
+      ...(s.dayOverrides    !== undefined ? { day_overrides:      s.dayOverrides    } : {}),
+      ...(s.calendarEvents  !== undefined ? { calendar_events:    s.calendarEvents  } : {}),
     }, { onConflict: 'user_id' });
 
     if (error) console.error('updateSettings error:', error);
     else console.log('Settings saved:', s.onboardingComplete);
+  }, []);
+
+  // ── saveScheduleToSupabase ─────────────────────────────────────────────────
+  // Reads all device-local keys and persists them to Supabase settings so the
+  // data follows the user across devices and doesn't bleed between accounts.
+  const saveScheduleToSupabase = useCallback(async () => {
+    const uid = userIdRef.current;
+    if (!uid) return;
+    try {
+      const read = (k: string) => localStorage.getItem(k) ?? undefined;
+      const payload: Record<string, string | undefined> = {
+        schedule_data:      read('trackit_class_schedule'),
+        schedule_type_pref: read('trackit_schedule_type'),
+        adjusted_days:      read('trackit_adjusted_days'),
+        block_anchor:       read('trackit_block_anchor'),
+        day_overrides:      read('trackit_day_overrides'),
+        calendar_events:    read('trackit_calendar_events'),
+        canvas_domain:      read('trackit_canvas_domain'),
+      };
+      // Only include defined keys to avoid overwriting with null
+      const defined = Object.fromEntries(
+        Object.entries(payload).filter(([, v]) => v !== undefined)
+      );
+      if (Object.keys(defined).length === 0) return;
+      await supabase.from('settings').upsert(
+        { user_id: uid, ...defined },
+        { onConflict: 'user_id' }
+      );
+    } catch (e) {
+      console.error('saveScheduleToSupabase:', e);
+    }
   }, []);
 
   // ── reset ──────────────────────────────────────────────────────────────────
@@ -369,6 +436,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── signOut ────────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    // Clear all user-specific localStorage so the next user on this device starts fresh
+    try {
+      resetAllStorage();
+      localStorage.removeItem('trackit_settings');
+    } catch {}
     setAssignments([]); setCourses([]); setScreen('today'); setDetailId(null); setUserId(null);
   }, []);
 
@@ -377,7 +449,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       assignments, courses, screen, detailId, settings, loading, userId, userEmail, authed,
       writeError, clearWriteError,
       navigate, updateAssignments, upsertAssignments, updateCourses,
-      patchAssignment, deleteAssignment, updateSettings, reset, signOut,
+      patchAssignment, deleteAssignment, updateSettings, saveScheduleToSupabase, reset, signOut,
     }}>
       {children}
     </Ctx.Provider>
