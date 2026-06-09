@@ -35,14 +35,6 @@ const Ctx = createContext<AppCtx | null>(null);
 
 // ── Row converters ────────────────────────────────────────────────────────────
 function toDbAssignment(a: Assignment, uid: string) {
-  // Only includes columns that exist in the original Supabase schema.
-  // New columns (effort, weight, communications) require ALTER TABLE migrations
-  // before they can be included here. Add them back once migrations are confirmed:
-  //
-  //   ALTER TABLE assignments
-  //     ADD COLUMN IF NOT EXISTS effort         text    DEFAULT null,
-  //     ADD COLUMN IF NOT EXISTS weight         float   DEFAULT null,
-  //     ADD COLUMN IF NOT EXISTS communications jsonb   DEFAULT '[]';
   return {
     id: a.id, user_id: uid, name: a.name,
     class_id: null, class_name: a.className, class_color: a.classColor,
@@ -85,10 +77,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [writeError,  setWriteError]  = useState<string | null>(null);
   const clearWriteError = useCallback(() => setWriteError(null), []);
 
-  // useRef so callbacks always read the latest userId without needing it
-  // in their dependency arrays. A plain object literal re-created each render
-  // breaks this — useCallback with [] deps would capture the first render's
-  // object whose .current is permanently null.
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = userId;
 
@@ -106,11 +94,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Deduplicate: skip if we already loaded for this uid in this session
     if (loadedForRef.current === uid) return;
     loadedForRef.current = uid;
-    const [{ data: cData }, { data: aData }, { data: sData }] = await Promise.all([
+
+    const [{ data: cData }, { data: aData }, { data: sData, error: sError }] = await Promise.all([
       supabase.from('courses').select('id, name, color, description, teacher_name, room, canvas_name, canvas_id, created_at').eq('user_id', uid).order('created_at'),
       supabase.from('assignments').select('id, name, class_id, class_name, class_color, due_date, done, notes, type, subtasks, effort, weight, communications, created_at').eq('user_id', uid).order('created_at'),
       supabase.from('settings').select('user_id, agenda_lookahead_days, focus_work_minutes, focus_break_minutes, grade_level, current_semester, onboarding_complete, microsteps_enabled, microsteps_ai, terms_accepted, canvas_domain, canvas_token, schedule_data, schedule_type_pref, adjusted_days, block_anchor, day_overrides, calendar_events').eq('user_id', uid).maybeSingle(),
     ]);
+
     if (cData) setCourses(cData.map(fromDbCourse));
     if (aData) {
       // Deduplicate on load — remove any duplicates by name+dueDate+className keeping latest
@@ -121,7 +111,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       setAssignments(Array.from(seen.values()).map(fromDbAssignment));
     }
-    if (sData) {
+
+    if (sError) {
+      // The settings SELECT failed — most likely one or more ALTER TABLE migrations
+      // haven't been run yet (missing column → Supabase returns 400, data is null).
+      // NEVER fall back to DEFAULT_SETTINGS here: that would reset termsAccepted and
+      // onboardingComplete and send the user through both screens on every reload.
+      // Instead, trust whatever is already in localStorage — it was written by the
+      // last successful updateSettings() call and is the best data we have.
+      console.error('loadData: settings query failed — pending migrations?', sError.code, sError.message);
+      const localS = loadSettings();
+      setSettings(localS);
+      // Leave localStorage untouched — it already holds the correct values.
+    } else if (sData) {
       const s: AppSettings = {
         agendaLookaheadDays:  sData.agenda_lookahead_days  ?? 0,
         focusWorkMinutes:     sData.focus_work_minutes      ?? 10,
@@ -129,17 +131,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         gradeLevel:           sData.grade_level             ?? '',
         currentSemester:      sData.current_semester        ?? 'fall',
         onboardingComplete:   sData.onboarding_complete     ?? false,
-        microstepsEnabled:    sData.microsteps_enabled       ?? true,
-        microstepsAI:         sData.microsteps_ai             ?? false,
-        termsAccepted:        sData.terms_accepted            ?? false,
-        canvasDomain:         sData.canvas_domain            ?? undefined,
-        canvasToken:          sData.canvas_token             ?? undefined,
-        scheduleData:         sData.schedule_data            ?? undefined,
-        scheduleType:         sData.schedule_type_pref       ?? undefined,
-        adjustedDays:         sData.adjusted_days            ?? undefined,
-        blockAnchor:          sData.block_anchor             ?? undefined,
-        dayOverrides:         sData.day_overrides            ?? undefined,
-        calendarEvents:       sData.calendar_events          ?? undefined,
+        microstepsEnabled:    sData.microsteps_enabled      ?? true,
+        microstepsAI:         sData.microsteps_ai           ?? false,
+        termsAccepted:        sData.terms_accepted          ?? false,
+        canvasDomain:         sData.canvas_domain           ?? undefined,
+        canvasToken:          sData.canvas_token            ?? undefined,
+        scheduleData:         sData.schedule_data           ?? undefined,
+        scheduleType:         sData.schedule_type_pref      ?? undefined,
+        adjustedDays:         sData.adjusted_days           ?? undefined,
+        blockAnchor:          sData.block_anchor            ?? undefined,
+        dayOverrides:         sData.day_overrides           ?? undefined,
+        calendarEvents:       sData.calendar_events         ?? undefined,
       };
       setSettings(s);
       saveSettings(s);
@@ -161,16 +163,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       } catch {}
     } else {
-      // New user — clear everything so they start completely fresh
-      try {
-        [
-          'trackit_settings', 'trackit_class_schedule', 'trackit_schedule_type',
-          'trackit_adjusted_days', 'trackit_block_anchor', 'trackit_day_overrides',
-          'trackit_calendar_events', 'trackit_canvas_domain', 'trackit_canvas_token',
-          'trackit_canvas_selected_ids',
-        ].forEach(k => localStorage.removeItem(k));
-      } catch {}
-      setSettings({ ...DEFAULT_SETTINGS });
+      // No settings row found. Guard against treating an existing user as new:
+      // if localStorage already has onboardingComplete/termsAccepted=true, trust it.
+      // Only wipe and reset if localStorage also looks genuinely new.
+      const localS = loadSettings();
+      if (localS.onboardingComplete || localS.termsAccepted) {
+        // Existing user whose row is temporarily missing — trust localStorage.
+        setSettings(localS);
+      } else {
+        // Genuinely new user — clear stale keys and start fresh.
+        try {
+          [
+            'trackit_settings', 'trackit_class_schedule', 'trackit_schedule_type',
+            'trackit_adjusted_days', 'trackit_block_anchor', 'trackit_day_overrides',
+            'trackit_calendar_events', 'trackit_canvas_domain', 'trackit_canvas_token',
+            'trackit_canvas_selected_ids',
+          ].forEach(k => localStorage.removeItem(k));
+        } catch {}
+        setSettings({ ...DEFAULT_SETTINGS });
+      }
     }
     setLoading(false);
   }
@@ -216,10 +227,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── updateAssignments ──────────────────────────────────────────────────────
-  // Accepts an optional `changed` array. When provided, only those records are
-  // upserted — the rest already exist in Supabase and don't need touching.
-  // When omitted, the full array is upserted (legacy behaviour) with a warning
-  // so callers can be found and migrated to pass `changed`.
   const updateAssignments = useCallback(async (updated: Assignment[], changed?: Assignment[]) => {
     setAssignments(updated);
 
@@ -246,14 +253,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── upsertAssignments ──────────────────────────────────────────────────────
-  // For inserting brand-new records only (syllabus import, voice import, etc.).
-  // Derives existing ID map from in-memory state — no extra Supabase round-trip.
-  // Re-syncing Canvas: IDs are reused for matching name+dueDate+className combos
-  // so repeated imports update in-place rather than create duplicates.
   const upsertAssignments = useCallback(async (added: Assignment[]) => {
     if (added.length === 0) return;
 
-    // Wait up to 3s for userId if it hasn't resolved yet (e.g. right after Canvas sync)
     let uid = userIdRef.current;
     if (!uid) {
       for (let i = 0; i < 30; i++) {
@@ -264,8 +266,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (!uid) { console.error('upsertAssignments: no userId after wait'); return; }
 
-    // Build ID map from current in-memory assignments — no DB round-trip needed.
-    // setAssignments is called with a function so we can read the latest snapshot.
     let existingIdMap: Map<string, string> = new Map();
     setAssignments(prev => {
       existingIdMap = new Map(prev.map(a => [`${a.name}||${a.dueDate}||${a.className}`, a.id]));
@@ -274,17 +274,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const key = `${a.name}||${a.dueDate}||${a.className}`;
         return existingIdMap.has(key) ? { ...a, id: existingIdMap.get(key)! } : a;
       });
-      // Replace existing records with updated ones, add new ones
       return [...prev.filter(a => !merged.find(m => m.id === a.id)), ...merged];
     });
 
-    // Reuse existing IDs for matching records so upsert works correctly
     const toWrite = added.map(a => {
       const key = `${a.name}||${a.dueDate}||${a.className}`;
       return { ...a, id: existingIdMap.get(key) ?? a.id };
     });
 
-    // Upsert in batches of 20
     for (let i = 0; i < toWrite.length; i += 20) {
       const batch = toWrite.slice(i, i + 20);
       const rows  = batch.map(a => toDbAssignment(a, uid!));
@@ -309,7 +306,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (!uid) { console.error('updateCourses: no userId'); return; }
 
-    // Delete removed courses, upsert remaining
     const { error: delErr } = await supabase
       .from('courses')
       .delete()
@@ -327,10 +323,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── patchAssignment ────────────────────────────────────────────────────────
-  // Single-record update — always targeted, never writes the full array.
-  // Optimistically updates local state, rolls back on Supabase error.
   const patchAssignment = useCallback(async (updated: Assignment) => {
-    // Save previous state for rollback
     let previous: Assignment | undefined;
     setAssignments(prev => {
       previous = prev.find(a => a.id === updated.id);
@@ -346,7 +339,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.error('patchAssignment:', error);
-      // Roll back to previous state
       if (previous) setAssignments(prev => prev.map(a => a.id === updated.id ? previous! : a));
       setWriteError('Failed to update assignment. Check your connection and try again.');
     }
@@ -397,8 +389,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── saveScheduleToSupabase ─────────────────────────────────────────────────
-  // Reads all device-local keys and persists them to Supabase settings so the
-  // data follows the user across devices and doesn't bleed between accounts.
   const saveScheduleToSupabase = useCallback(async () => {
     const uid = userIdRef.current;
     if (!uid) return;
@@ -413,7 +403,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         calendar_events:    read('trackit_calendar_events'),
         canvas_domain:      read('trackit_canvas_domain'),
       };
-      // Only include defined keys to avoid overwriting with null
       const defined = Object.fromEntries(
         Object.entries(payload).filter(([, v]) => v !== undefined)
       );
@@ -428,8 +417,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── reset ──────────────────────────────────────────────────────────────────
-  // Confirmation is handled by the calling screen via ConfirmSheet.
-  // This function unconditionally deletes all user data.
   const reset = useCallback(async () => {
     const uid = userIdRef.current;
     if (!uid) { console.error('reset: no userId'); return; }
@@ -441,16 +428,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (aResult.error) console.error('reset assignments failed:', aResult.error);
     if (cResult.error) console.error('reset courses failed:', cResult.error);
 
-    // Clear local state regardless — even if the DB call failed, local UI resets
     setAssignments([]); setCourses([]); setScreen('today'); setDetailId(null);
-    // Clear all localStorage keys so next session starts completely fresh
     resetAllStorage();
   }, []);
 
   // ── signOut ────────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    // Clear all user-specific localStorage so the next user on this device starts fresh
     try {
       resetAllStorage();
       localStorage.removeItem('trackit_settings');
