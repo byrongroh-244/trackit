@@ -265,11 +265,16 @@ export default function OnboardingScreen({ isNewSemester = false, onComplete }: 
   }
 
   async function finish(goTo?: 'add' | 'canvas') {
+    // 1. Write schedule to localStorage first so saveScheduleToSupabase reads it
     saveScheduleToStorage();
-    setTimeout(() => saveScheduleToSupabase(), 0);
-    await updateSettings({ ...settings, gradeLevel, currentSemester: semester, onboardingComplete: true });
+    // 2. Persist schedule to Supabase before flipping onboardingComplete —
+    //    await ensures it lands even if the user is navigated away immediately
+    await saveScheduleToSupabase();
+    // 3. Save courses
     if (isNewSemester) await updateCourses([...existingCourses, ...newCourses]);
     else await updateCourses(newCourses);
+    // 4. Mark onboarding complete last — this triggers App.tsx routing
+    await updateSettings({ ...settings, gradeLevel, currentSemester: semester, onboardingComplete: true });
     if (goTo === 'canvas') navigate('canvas');
     else if (goTo === 'add') navigate('add');
     else onComplete();
@@ -525,7 +530,7 @@ export default function OnboardingScreen({ isNewSemester = false, onComplete }: 
       <p style={{ fontSize: 14, color: Colors.textHint, margin: '0 0 20px', lineHeight: 1.5 }}>Add manually or connect Canvas to import everything at once.</p>
 
       {/* Canvas option */}
-      <div onClick={() => { updateSettings({ ...settings, onboardingComplete: true }); navigate('canvas'); }}
+      <div onClick={() => finish('canvas')}
         style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 16, background: '#E0EEFB', border: '1.5px solid #2764A818', cursor: 'pointer', marginBottom: 16 }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: '#2764A8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>

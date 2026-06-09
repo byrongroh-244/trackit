@@ -92,7 +92,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = userId;
 
+  // Guard: track which userId we've already loaded data for so the
+  // getSession() call and the onAuthStateChange INITIAL_SESSION event
+  // don't both trigger loadData for the same user on first mount /
+  // email-redirect. Without this, a new user sees their settings row
+  // not yet written, loadData sets DEFAULT_SETTINGS (termsAccepted=false,
+  // onboardingComplete=false), then the second loadData run does the same
+  // — so both Terms and Onboarding screens show in sequence even after
+  // the user has already accepted/completed them in the same session.
+  const loadedForRef = useRef<string | null>(null);
+
   async function loadData(uid: string) {
+    // Deduplicate: skip if we already loaded for this uid in this session
+    if (loadedForRef.current === uid) return;
+    loadedForRef.current = uid;
     const [{ data: cData }, { data: aData }, { data: sData }] = await Promise.all([
       supabase.from('courses').select('id, name, color, description, teacher_name, room, canvas_name, canvas_id, created_at').eq('user_id', uid).order('created_at'),
       supabase.from('assignments').select('id, name, class_id, class_name, class_color, due_date, done, notes, type, subtasks, effort, weight, communications, created_at').eq('user_id', uid).order('created_at'),
@@ -192,6 +205,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAssignments([]);
         setCourses([]);
         setLoading(false);
+        loadedForRef.current = null; // allow fresh load on next login
       }
     });
     return () => subscription.unsubscribe();

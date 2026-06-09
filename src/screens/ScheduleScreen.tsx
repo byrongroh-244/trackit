@@ -40,7 +40,7 @@ export default function ScheduleScreen() {
   function saveAdjDays(updated: { label: string }[]) {
     setAdjDaysState(updated);
     setAdjustedDays(updated as any);
-    setTimeout(() => saveScheduleToSupabase(), 0);
+    saveScheduleToSupabase();
   }
 
   const DAY_NAMES_SHORT = ['Mo','Tu','We','Th','Fr'];
@@ -58,14 +58,14 @@ export default function ScheduleScreen() {
   function savePeriods(updated: ClassPeriod[]) {
     setPeriods(updated);
     setSchedule(updated);
-    setTimeout(() => saveScheduleToSupabase(), 0);
+    saveScheduleToSupabase();
   }
 
   function saveType(t: 'standard' | 'block') {
     setSchedType(t);
     setScheduleType(t);
     if (t === 'block') getOrCreateBlockAnchor();
-    setTimeout(() => saveScheduleToSupabase(), 0);
+    saveScheduleToSupabase();
   }
 
   function deletePeriod(p: ClassPeriod) {

@@ -40,7 +40,7 @@ export default function CalendarScreen() {
     setEventsState(updated);
     setCalendarEvents(updated);
     setEditingEvent(null);
-    setTimeout(() => saveScheduleToSupabase(), 0);
+    saveScheduleToSupabase();
   }
 
   function deleteEvent(e: CalendarEvent) {
@@ -48,7 +48,7 @@ export default function CalendarScreen() {
     setEventsState(updated);
     setCalendarEvents(updated);
     setEditingEvent(null);
-    setTimeout(() => saveScheduleToSupabase(), 0);
+    saveScheduleToSupabase();
   }
 
   function eventsForDate(dateKey: string): CalendarEvent[] {
@@ -86,7 +86,7 @@ export default function CalendarScreen() {
       setDayOverrides(next);
       return next;
     });
-    setTimeout(() => saveScheduleToSupabase(), 0);
+    saveScheduleToSupabase();
   }
 
   // Derive A or B for any date purely from the anchor week + overrides.
